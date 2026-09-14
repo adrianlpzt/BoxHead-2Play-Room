@@ -10,6 +10,7 @@ export const PICKUP_TYPES = {
   turret: { color: 0x5a6678, label: 'torreta', amount: 1 },
   grenade: { color: 0x8fae4a, label: 'granada', amount: 1 },
   rocket: { color: 0xff6a3b, label: 'cohete', amount: 1 },
+  plasma: { color: 0x86f5ff, label: 'carga de plasma', amount: 5 },
   essence: { color: 0x9fe0f0, label: 'esencia', amount: 18 },
   health: { color: 0x62d67a, label: 'botiquín', amount: 30 },
 };

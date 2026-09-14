@@ -15,6 +15,7 @@ import { Decals } from './systems/Decals.js';
 import { Fireballs } from './systems/Fireballs.js';
 import { Grenades } from './systems/Grenades.js';
 import { Shockwaves } from './systems/Shockwaves.js';
+import { PlasmaBeam } from './systems/Plasma.js';
 import { SPELLS, SPELL_ORDER, SPELL_CAST } from './systems/Spells.js';
 import { AudioKit } from './systems/Audio.js';
 import { Input } from './core/Input.js';
@@ -83,6 +84,7 @@ const weapons = new WeaponSystem(scene, 240);
 const fireballs = new Fireballs(scene, 32);
 const grenades = new Grenades(scene, 16);
 const shockwaves = new Shockwaves(scene, 14);
+const plasma = new PlasmaBeam(scene);
 const player = new Player(scene);
 const input = new Input(canvas);
 const hud = new HUD();
@@ -99,7 +101,7 @@ window.addEventListener('keydown', unlockAudio);
 let hitstop = 0;
 
 const game = {
-  scene, arena, decals, particles, debris, shells, weapons, fireballs, grenades, shockwaves,
+  scene, arena, decals, particles, debris, shells, weapons, fireballs, grenades, shockwaves, plasma,
   player, audio, grid,
   walls: arena.walls,
   zombies: [],
@@ -115,7 +117,7 @@ const game = {
   multiplier: 1,
   weapon: 'pistol',
   unlocked: new Set(['pistol']),
-  ammo: { pistol: Infinity, shotgun: 12, uzi: 90, barrel: 2, mine: 2, barricade: 2, turret: 1, grenade: 3, rocket: 1 },
+  ammo: { pistol: Infinity, shotgun: 12, uzi: 90, barrel: 2, mine: 2, barricade: 2, turret: 1, grenade: 3, rocket: 1, plasma: 8 },
   essence: 20,
   maxEssence: 100,
   unlockedSpells: new Set(),
@@ -157,6 +159,7 @@ const game = {
     if (this.combo % 5 === 0) this.ammo.mine += 1;
     if (this.combo % 8 === 0) this.ammo.barricade += 1;
     if (this.combo % 15 === 0) this.ammo.turret += 1;
+    if (this.combo % 10 === 0) this.ammo.plasma += 1;
     if (this.combo % 7 === 0) this.ammo.grenade += 1;
     if (this.combo % 12 === 0) this.ammo.rocket += 1;
 
@@ -180,6 +183,7 @@ const game = {
     this.ammo.mine += 1;
     this.ammo.barricade += 1;
     if (n % 3 === 0) this.ammo.turret += 1;
+    this.ammo.plasma += 4;
     this.ammo.grenade += 2;
     this.ammo.rocket += 1;
     hud.showBanner(`Oleada ${n} despejada`, 2);
@@ -238,7 +242,7 @@ function maybeDrop(zombie) {
   else if (game.ammo.uzi < 25) kind = 'uzi';
   else if (game.ammo.shotgun < 6) kind = 'shotgun';
   else {
-    const pool = ['barrel', 'shotgun', 'uzi', 'mine', 'barricade', 'grenade', 'rocket'];
+    const pool = ['barrel', 'shotgun', 'uzi', 'mine', 'barricade', 'grenade', 'rocket', 'plasma'];
     kind = pool[Math.floor(Math.random() * pool.length)];
   }
 
@@ -447,6 +451,20 @@ function handleShooting() {
     return;
   }
 
+  if (w.beam) {
+    const wantsFire = input.fireTapped || input.tapped('Space');
+    if (!wantsFire || weapons.cooldown > 0 || game.ammo.plasma <= 0) return;
+    aimDir.set(aimPoint.x - player.position.x, 0, aimPoint.z - player.position.z);
+    if (aimDir.lengthSq() < 0.001) return;
+    aimDir.normalize();
+    player.muzzle(muzzlePos);
+    plasma.fire(game, muzzlePos, aimDir);
+    weapons.cooldown = w.cooldown;
+    game.ammo.plasma -= 1;
+    if (game.ammo.plasma <= 0) selectWeapon('pistol');
+    return;
+  }
+
   const wantsFire = w.auto
     ? input.fireDown || input.pressed('Space')
     : input.fireTapped || input.tapped('Space');
@@ -505,6 +523,7 @@ function resetGame() {
   fireballs.clear();
   grenades.clear();
   shockwaves.clear();
+  plasma.clear();
   particles.clear();
   debris.clear();
   shells.clear();
@@ -518,7 +537,7 @@ function resetGame() {
   game.bestMultiplier = 1;
   game.weapon = 'pistol';
   game.unlocked = new Set(['pistol']);
-  game.ammo = { pistol: Infinity, shotgun: 12, uzi: 90, barrel: 2, mine: 2, barricade: 2, turret: 1, grenade: 3, rocket: 1 };
+  game.ammo = { pistol: Infinity, shotgun: 12, uzi: 90, barrel: 2, mine: 2, barricade: 2, turret: 1, grenade: 3, rocket: 1, plasma: 8 };
   game.essence = 20;
   game.unlockedSpells = new Set();
   game.spellCooldowns = { stomp: 0, frostnova: 0 };
@@ -566,7 +585,9 @@ function tick() {
     input.moveVector(moveDir);
 
     WEAPON_ORDER.forEach((id, i) => {
-      if (input.tapped(`Digit${i + 1}`)) selectWeapon(id);
+      // Armas 1-9 → teclas 1..9; la 10ª → tecla 0.
+      const key = i < 9 ? `Digit${i + 1}` : 'Digit0';
+      if (input.tapped(key)) selectWeapon(id);
     });
     if (input.tapped('KeyB') && game.unlocked.has('barrel')) {
       if (game.weapon === 'barrel') placeBarrel();
@@ -623,6 +644,7 @@ function tick() {
   debris.update(dt);
   shells.update(dt);
   shockwaves.update(raw);
+  plasma.update(raw);
   decals.update(raw);
 
   // Intensidad musical: presión de enemigos + un plus si estamos a oscuras.

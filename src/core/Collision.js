@@ -61,3 +61,51 @@ export function distXZ(a, b) {
 export const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
 export const lerp = (a, b, t) => a + (b - a) * t;
 export const rand = (min, max) => min + Math.random() * (max - min);
+
+/**
+ * Distancia² del punto (px,pz) al segmento (ax,az)-(bx,bz), en el plano XZ.
+ * Base del rayo de plasma: un enemigo es "tocado" si esta distancia < su radio.
+ * Devuelve también `t` (0..1), la proyección a lo largo del segmento, útil para
+ * ordenar impactos por cercanía al origen.
+ */
+export function segPointDist2(ax, az, bx, bz, px, pz) {
+  const dx = bx - ax;
+  const dz = bz - az;
+  const len2 = dx * dx + dz * dz;
+  let t = len2 > 1e-9 ? ((px - ax) * dx + (pz - az) * dz) / len2 : 0;
+  t = Math.max(0, Math.min(1, t));
+  const cx = ax + dx * t;
+  const cz = az + dz * t;
+  const ex = px - cx;
+  const ez = pz - cz;
+  return { d2: ex * ex + ez * ez, t };
+}
+
+/** Punto donde un rayo (origen + dir·t) corta el primer muro AABB, o `maxDist`. */
+export function rayWallDist(ox, oz, dx, dz, walls, maxDist) {
+  let best = maxDist;
+  for (const w of walls) {
+    // Slab test 2D contra el AABB.
+    let tmin = 0;
+    let tmax = best;
+    let ok = true;
+    for (const axis of [0, 1]) {
+      const o = axis === 0 ? ox : oz;
+      const d = axis === 0 ? dx : dz;
+      const lo = axis === 0 ? w.minX : w.minZ;
+      const hi = axis === 0 ? w.maxX : w.maxZ;
+      if (Math.abs(d) < 1e-9) {
+        if (o < lo || o > hi) { ok = false; break; }
+      } else {
+        let t1 = (lo - o) / d;
+        let t2 = (hi - o) / d;
+        if (t1 > t2) { const tmp = t1; t1 = t2; t2 = tmp; }
+        tmin = Math.max(tmin, t1);
+        tmax = Math.min(tmax, t2);
+        if (tmin > tmax) { ok = false; break; }
+      }
+    }
+    if (ok && tmin >= 0 && tmin < best) best = tmin;
+  }
+  return best;
+}

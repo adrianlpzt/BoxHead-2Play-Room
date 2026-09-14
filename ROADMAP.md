@@ -157,18 +157,33 @@ Por coste, de menor a mayor:
 
 ### Pendiente en esta tanda
 
-5. **Barricadas** (arma que falta, la barata — `Crate` colocable).
-6. **Torreta** (arma que falta, IA de apuntado propia).
-7. **Rifle de plasma** (arma que falta, la cara — rayo continuo, pide
-   colisión segmento-contra-círculo que no existe).
+- [x] **5. Barricadas** — `Arena.spawnBarricade`: una `Crate` colocable de 2×2×1
+  vóxeles, hereda daño de balas/explosión y el desregistro de su AABB. Arma 6.
+- [x] **6. Torreta** — `entities/Turret.js`: cabezal que gira hacia el enemigo
+  más cercano (vía spatial hash), dispara ráfagas por el pool de balas
+  (`WeaponSystem.spawnBullet`, método nuevo), se agota a los 60 disparos y la
+  horda la derriba a golpes. Arma 7.
+- [x] **7. Rifle de plasma** — `systems/Plasma.js`: hitscan puro que atraviesa a
+  TODOS los enemigos en línea recta hasta el primer muro (colisión
+  segmento-contra-círculo nueva en `Collision.js`: `segPointDist2` +
+  `rayWallDist`). Daño marcado como explosivo → derrite la placa del acorazado.
+  Arma 10 (tecla `0`). Haz visual efímero.
+
+### Pendiente
+
 8. **Vórtice Gravitatorio y Círculo de Almas** (magias que faltan —
    arquitectura nueva de verdad en ambos).
 9. **Menú principal** — estado nuevo antes de `playing`, autocontenido.
 10. **Más mapas** (Tight/Columns/Reactor primero, Rooftop es el caro).
 11. **Ruleta de selección de arma estilo GTA** (slowmo + blur + radial) —
     requiere postprocesado (`EffectComposer`), que el proyecto aún no tiene.
+    Ahora más útil que antes: con 10 armas, un selector radial gana peso.
 12. **Enemigos nuevos** (Nigromante, Volador, Baba, Juggernaut) — el Volador
     sigue siendo el ítem más caro (primera vez con altura real en Y).
+
+> Con el rifle de plasma quedan **cerradas las 3 armas pendientes del bloque 1**.
+> El arsenal completo son 10 armas: pistola, escopeta, uzi, barril, mina,
+> barricada, torreta, granada, cohete, plasma (teclas 1-9 y 0).
 
 > Nota tras esta tanda: los VFX de magia, los apagones y la música **no se han
 > podido verificar visual/sonoramente** (el entorno de desarrollo no tiene
