@@ -176,3 +176,74 @@ body.night { --ink-dim: #6f7a86; }
 @media (max-width: 720px) {
   #help, .hud-run { display: none; }
 }
+
+/* ---------------------------------------------------------- Ruleta de armas */
+#wheel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+#wheel[hidden] { display: none; }
+
+/* Simulación del "blur" de GTA sin postprocesado: oscurecido + viñeta radial.
+   El desenfoque óptico real necesitaría EffectComposer; esto se lee premium. */
+.wheel-scrim {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(6,7,10,0.35) 0%, rgba(6,7,10,0.72) 70%);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
+.wheel-svg {
+  position: relative;
+  width: min(70vh, 70vw);
+  height: min(70vh, 70vw);
+  filter: drop-shadow(0 8px 24px rgba(0,0,0,0.5));
+}
+
+.wheel-sector {
+  fill: rgba(18, 21, 27, 0.82);
+  stroke: rgba(232, 228, 217, 0.18);
+  stroke-width: 1.5;
+  transition: fill 0.08s ease;
+}
+.wheel-sector.current { fill: rgba(40, 46, 56, 0.9); }
+.wheel-sector.hot {
+  fill: var(--toxic);
+  stroke: #dff5c8;
+  stroke-width: 2.5;
+}
+
+.wheel-label {
+  fill: var(--ink);
+  font-family: inherit;
+  font-size: 22px;
+  font-weight: 600;
+  opacity: 0.75;
+  pointer-events: none;
+}
+
+.wheel-center {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+  pointer-events: none;
+}
+.wheel-center .wc-name {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+.wheel-center .wc-ammo {
+  font-size: 15px;
+  color: var(--toxic);
+  font-variant-numeric: tabular-nums;
+}

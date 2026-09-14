@@ -64,7 +64,7 @@ export const rand = (min, max) => min + Math.random() * (max - min);
 
 /**
  * Distancia² del punto (px,pz) al segmento (ax,az)-(bx,bz), en el plano XZ.
- * Base del rayo de plasma: un enemigo es "tocado" si esta distancia < su radio.
+ * Distancia punto-a-segmento en XZ (colisión de rayo/haz contra círculos).
  * Devuelve también `t` (0..1), la proyección a lo largo del segmento, útil para
  * ordenar impactos por cercanía al origen.
  */

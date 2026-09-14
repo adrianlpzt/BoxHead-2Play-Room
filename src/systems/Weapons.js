@@ -38,13 +38,9 @@ export const WEAPONS = {
     tracer: 0xff6a3b, unlockAt: 8,
     splash: { radius: 6, damage: 190, playerDamage: 50, color: 0xff8c4a },
   },
-  plasma: {
-    // Hitscan: no usa el pool de balas, lo gestiona PlasmaBeam. `beam:true`.
-    name: 'Plasma', beam: true, auto: false, cooldown: 0.85, unlockAt: 10,
-  },
 };
 
-export const WEAPON_ORDER = ['pistol', 'shotgun', 'uzi', 'barrel', 'mine', 'barricade', 'turret', 'grenade', 'rocket', 'plasma'];
+export const WEAPON_ORDER = ['pistol', 'shotgun', 'uzi', 'barrel', 'mine', 'barricade', 'turret', 'grenade', 'rocket'];
 
 const BULLET_GEO = new THREE.BoxGeometry(0.12, 0.12, 0.75);
 const SHELL = { x: 0.1, y: 0.1, z: 0.22 };

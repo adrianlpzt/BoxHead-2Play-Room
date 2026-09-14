@@ -190,3 +190,26 @@ Por coste, de menor a mayor:
 > navegador — solo build + smoke test por HTTP). Compilan y arrancan; el
 > comportamiento en pantalla habrá que confirmarlo jugando.
 
+
+---
+
+## Sesión de correcciones (post-armas)
+
+- [x] **Atasco en esquinas — segundo intento.** El primer arreglo (rodeo
+  perpendicular al jugador) redujo el problema pero no lo eliminó: esa
+  perpendicular es al objetivo, no al muro. El segundo calcula la dirección de
+  rodeo a partir de la **normal real del obstáculo** (la componente del avance
+  que la colisión se comió apunta hacia dentro del muro; su perpendicular corre
+  a lo largo de la pared), y el failsafe pasó a ser **persistente**: desde 4 s
+  de atasco acumulado empuja hacia el jugador atravesando geometría un poco cada
+  frame, sin auto-resetearse, hasta despegarse. Pendiente de confirmar en vivo.
+- [x] **Rifle de plasma ELIMINADO.** No se veía bien (orientación del haz).
+  Retirado por completo: `systems/Plasma.js` borrado, referencias limpiadas,
+  arsenal de vuelta a 9 armas. Las utilidades `segPointDist2`/`rayWallDist` se
+  conservan en `Collision.js` (genéricas, útiles a futuro).
+- [x] **Ruleta de selección de arma** (`core/WeaponWheel.js`) — overlay SVG
+  radial estilo GTA. Se abre manteniendo `Tab`, ralentiza el tiempo a 0,2×
+  (slowmo real), resalta el sector bajo el cursor y selecciona al soltar. Solo
+  muestra armas desbloqueadas. El "blur" es oscurecido + viñeta + backdrop-
+  filter por CSS, no postprocesado (el desenfoque óptico real necesitaría
+  `EffectComposer`, pendiente por si el CSS no convence en pantalla).

@@ -318,50 +318,61 @@ export class Zombie {
     for (const w of game.walls) resolveCircleBox(this.position, this.radius, w);
     for (const b of game.barrels) resolveCircleBox(this.position, this.radius, b.box);
 
-    // Deslizamiento por la pared. Cuando la colisión se come casi todo el avance,
-    // el zombi está bloqueado contra un obstáculo. En vez de recalcular la
-    // perpendicular al jugador cada frame (que oscila en las esquinas de 90° y
-    // deja al zombi atrapado en el vértice), fijamos UNA dirección de rodeo al
-    // entrar en estado de atasco y la mantenemos hasta salir — wall-following de
-    // verdad. Si el rodeo tampoco progresa, invertimos el lado.
+    // Deslizamiento por la pared. La clave: la dirección de rodeo se calcula a
+    // partir de la NORMAL REAL del obstáculo, no de la perpendicular al jugador.
+    // Esa normal la da la diferencia entre el movimiento deseado y el conseguido:
+    // lo que la resolución de colisión "se comió" apunta justo hacia dentro del
+    // muro, así que su perpendicular corre A LO LARGO de la pared.
     const wanted = Math.hypot(vx * dt, vz * dt);
-    const moved = Math.hypot(this.position.x - fromX, this.position.z - fromZ);
-    if (wanted > 1e-4 && moved < wanted * 0.45) {
+    const gotX = this.position.x - fromX;
+    const gotZ = this.position.z - fromZ;
+    const moved = Math.hypot(gotX, gotZ);
+
+    if (wanted > 1e-4 && moved < wanted * 0.6) {
       this.stuckTimer += dt;
       this.desperation += dt;
 
+      // Componente del avance deseado que la colisión bloqueó = normal del muro.
+      let nx = vx * dt - gotX;
+      let nz = vz * dt - gotZ;
+      const nlen = Math.hypot(nx, nz);
+      if (nlen > 1e-5) {
+        nx /= nlen;
+        nz /= nlen;
+      } else {
+        // Sin normal clara (raro): cae a la perpendicular al jugador.
+        nx = dx / d;
+        nz = dz / d;
+      }
+
       if (!this.sliding) {
-        // Acabamos de bloquearnos: congelamos la dirección de rodeo actual.
-        this.slideDir.set(-dz / d, 0, dx / d).multiplyScalar(this.slideSign);
         this.sliding = true;
-      } else if (this.stuckTimer > 0.8) {
-        // Llevamos rodeando y seguimos sin progresar: probamos el otro lado
-        // y refijamos la dirección desde el ángulo actual al jugador.
-        this.slideSign *= -1;
-        this.slideDir.set(-dz / d, 0, dx / d).multiplyScalar(this.slideSign);
+      } else if (this.stuckTimer > 0.7) {
+        this.slideSign *= -1; // el lado elegido no progresa: prueba el otro
         this.stuckTimer = 0;
       }
 
-      const slide = this.speed * dt * 0.95;
+      // Tangente a la pared = perpendicular a la normal, con el lado elegido.
+      this.slideDir.set(-nz, 0, nx).multiplyScalar(this.slideSign);
+      const slide = this.speed * dt * 1.1;
       this.position.x += this.slideDir.x * slide;
       this.position.z += this.slideDir.z * slide;
       for (const w of game.walls) resolveCircleBox(this.position, this.radius, w);
       for (const b of game.barrels) resolveCircleBox(this.position, this.radius, b.box);
     } else {
-      // Avanza con normalidad: sale del estado de atasco y drena la desesperación.
       this.sliding = false;
       if (this.stuckTimer > 0) this.stuckTimer = Math.max(0, this.stuckTimer - dt * 2);
-      this.desperation = Math.max(0, this.desperation - dt * 1.5);
+      this.desperation = Math.max(0, this.desperation - dt * 2);
     }
 
-    // Failsafe duro: si un zombi lleva ~7s de atasco acumulado, lo teletransizamos
-    // un paso hacia el jugador ignorando muros. Feo, pero garantiza que una ronda
-    // JAMÁS puede quedar bloqueada por un enemigo inalcanzable en un vértice.
-    if (this.desperation > 7) {
-      this.position.x += (dx / d) * this.speed * dt * 1.5;
-      this.position.z += (dz / d) * this.speed * dt * 1.5;
-      // No resolvemos colisión aquí a propósito: el objetivo es despegarlo del vértice.
-      if (this.desperation > 9) this.desperation = 0; // ventana de rescate consumida
+    // Failsafe persistente: a partir de 4s de atasco acumulado, se empuja hacia
+    // el jugador ATRAVESANDO la geometría un poco cada frame, y NO se auto-resetea.
+    // Solo la desesperación drena al moverse de verdad (rama else de arriba). Así
+    // ningún zombi puede quedar inalcanzable en un vértice: o rodea, o se despega.
+    if (this.desperation > 4) {
+      const push = this.speed * dt * (0.6 + (this.desperation - 4) * 0.3);
+      this.position.x += (dx / d) * push;
+      this.position.z += (dz / d) * push;
     }
 
     // --- Animación y estado -------------------------------------------------

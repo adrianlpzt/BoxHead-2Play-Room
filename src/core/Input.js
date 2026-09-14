@@ -16,7 +16,7 @@ export class Input {
     window.addEventListener('keydown', (e) => {
       if (!this.keys.has(e.code)) this.justPressed.add(e.code);
       this.keys.add(e.code);
-      if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
+      if (e.code === 'Space' || e.code === 'Tab' || e.code.startsWith('Arrow')) e.preventDefault();
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));
 

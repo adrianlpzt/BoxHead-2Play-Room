@@ -207,14 +207,6 @@ export class AudioKit {
     this.#tone({ type: 'square', from: 780, to: 780, dur: 0.14, gain: 0.2, delay: 0.09 });
   }
 
-  /** Rifle de plasma: zumbido energético agudo con cuerpo grave. */
-  plasma() {
-    if (!this.#ready('plasma', 0.05)) return;
-    this.#tone({ type: 'sawtooth', from: 1400, to: 300, dur: 0.22, gain: 0.32 });
-    this.#tone({ type: 'square', from: 700, to: 180, dur: 0.18, gain: 0.2, delay: 0.02 });
-    this.#burst({ gain: 0.3, dur: 0.2, type: 'bandpass', from: 3000, to: 800, q: 2 });
-  }
-
   // ----------------------------------------------------------- MÚSICA
   /**
    * Música de fondo 100% sintética, en dos capas persistentes:
