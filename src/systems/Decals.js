@@ -103,6 +103,37 @@ export class Decals {
     this.dirty = true;
   }
 
+  /** Grieta radial del Pisar del Titán: líneas quebradas saliendo del centro. */
+  crack(pos, radius, angle = 0, halfArc = Math.PI) {
+    const [cx, cy] = this.#px(pos.x, pos.z);
+    const g = this.ctx;
+    const px = (this.res / this.size) * radius;
+
+    g.strokeStyle = 'rgba(15,13,11,0.6)';
+    g.lineJoin = 'round';
+    const branches = 7;
+    for (let i = 0; i < branches; i++) {
+      const a = angle + (Math.random() - 0.5) * 2 * halfArc;
+      const len = px * (0.5 + Math.random() * 0.5);
+      g.lineWidth = px * (0.04 + Math.random() * 0.05);
+      g.beginPath();
+      g.moveTo(cx, cy);
+      // Línea quebrada en 3 tramos, con desvío lateral para que parezca fractura.
+      let x = cx;
+      let y = cy;
+      const steps = 3;
+      for (let s = 1; s <= steps; s++) {
+        const t = (len / steps) * s;
+        const jitter = (Math.random() - 0.5) * px * 0.25;
+        x = cx + Math.sin(a) * t + Math.cos(a) * jitter;
+        y = cy + Math.cos(a) * t + Math.sin(a) * jitter;
+        g.lineTo(x, y);
+      }
+      g.stroke();
+    }
+    this.dirty = true;
+  }
+
   update(dt) {
     if (!this.dirty) return;
     this.timer -= dt;

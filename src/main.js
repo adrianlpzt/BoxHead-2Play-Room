@@ -13,6 +13,7 @@ import { Debris } from './systems/Debris.js';
 import { Decals } from './systems/Decals.js';
 import { Fireballs } from './systems/Fireballs.js';
 import { Grenades } from './systems/Grenades.js';
+import { Shockwaves } from './systems/Shockwaves.js';
 import { SPELLS, SPELL_ORDER, SPELL_CAST } from './systems/Spells.js';
 import { AudioKit } from './systems/Audio.js';
 import { Input } from './core/Input.js';
@@ -80,6 +81,7 @@ const shells = new Debris(scene, 150);
 const weapons = new WeaponSystem(scene, 240);
 const fireballs = new Fireballs(scene, 32);
 const grenades = new Grenades(scene, 16);
+const shockwaves = new Shockwaves(scene, 14);
 const player = new Player(scene);
 const input = new Input(canvas);
 const hud = new HUD();
@@ -96,7 +98,7 @@ window.addEventListener('keydown', unlockAudio);
 let hitstop = 0;
 
 const game = {
-  scene, arena, decals, particles, debris, shells, weapons, fireballs, grenades,
+  scene, arena, decals, particles, debris, shells, weapons, fireballs, grenades, shockwaves,
   player, audio, grid,
   walls: arena.walls,
   zombies: [],
@@ -175,6 +177,7 @@ const game = {
     this.ammo.grenade += 2;
     this.ammo.rocket += 1;
     hud.showBanner(`Oleada ${n} despejada`, 2);
+    audio.waveCleared();
   },
 
   onPlayerDeath() {
@@ -249,6 +252,62 @@ function setNight(on) {
   scene.fog.far = on ? 64 : 110;
   player.setFlashlight(on);
   hud.setNight(on);
+}
+
+// --------------------------------------------------- apagones automáticos
+// A partir de cierta oleada, la luz se corta sola cada cierto tiempo durante
+// unos segundos, obligando a depender de la linterna. Máquina de estados:
+// clear → warn (parpadeo de aviso) → blackout (a oscuras) → clear.
+const BLACKOUT = {
+  firstWave: 6,     // no ocurre antes de esta oleada
+  interval: 42,     // segundos entre apagones
+  warnTime: 2.5,    // aviso previo
+  duration: 24,     // cuánto dura la oscuridad
+};
+const blackout = { state: 'clear', timer: BLACKOUT.interval, flicker: 0, manual: false };
+
+function updateBlackout(dt) {
+  // Si el jugador ha forzado la noche con L, el sistema automático no interfiere.
+  if (blackout.manual) return;
+
+  switch (blackout.state) {
+    case 'clear':
+      if (game.waves.wave >= BLACKOUT.firstWave && game.waves.state === 'active') {
+        blackout.timer -= dt;
+        if (blackout.timer <= 0) {
+          blackout.state = 'warn';
+          blackout.timer = BLACKOUT.warnTime;
+          hud.showBanner('Se va la luz…', 2);
+          audio.wave();
+        }
+      }
+      break;
+    case 'warn':
+      // Parpadeo nervioso de las luces antes del corte.
+      blackout.timer -= dt;
+      blackout.flicker -= dt;
+      if (blackout.flicker <= 0) {
+        blackout.flicker = 0.12 + Math.random() * 0.1;
+        const dim = Math.random() < 0.5;
+        ambient.intensity = dim ? 0.4 : 1.1;
+        sun.intensity = dim ? 0.5 : 1.5;
+      }
+      if (blackout.timer <= 0) {
+        setNight(true);
+        blackout.state = 'blackout';
+        blackout.timer = BLACKOUT.duration;
+      }
+      break;
+    case 'blackout':
+      blackout.timer -= dt;
+      if (blackout.timer <= 0) {
+        setNight(false);
+        blackout.state = 'clear';
+        blackout.timer = BLACKOUT.interval;
+        hud.showBanner('Vuelve la luz', 1.5);
+      }
+      break;
+  }
 }
 
 // --------------------------------------------------------- apuntado y tiro
@@ -403,6 +462,7 @@ function resetGame() {
   weapons.clear();
   fireballs.clear();
   grenades.clear();
+  shockwaves.clear();
   particles.clear();
   debris.clear();
   shells.clear();
@@ -425,6 +485,10 @@ function resetGame() {
   hitstop = 0;
 
   waves.reset();
+  if (game.night) setNight(false);
+  blackout.state = 'clear';
+  blackout.timer = BLACKOUT.interval;
+  blackout.manual = false;
   hud.hideGameOver();
 }
 
@@ -441,7 +505,15 @@ function tick() {
     dt = 0;
   }
 
-  if (input.tapped('KeyL')) setNight(!game.night);
+  if (input.tapped('KeyL')) {
+    blackout.manual = !game.night;
+    setNight(!game.night);
+    if (!blackout.manual) {
+      // Al volver a la luz manualmente, rearmamos el ciclo automático desde cero.
+      blackout.state = 'clear';
+      blackout.timer = BLACKOUT.interval;
+    }
+  }
   if (input.tapped('KeyM')) hud.showBanner(audio.toggleMute() ? 'Sonido apagado' : 'Sonido activo', 1.2);
 
   if (game.state === 'over') {
@@ -500,12 +572,18 @@ function tick() {
     }
 
     waves.update(dt);
+    updateBlackout(dt);
   }
 
   particles.update(dt);
   debris.update(dt);
   shells.update(dt);
+  shockwaves.update(raw);
   decals.update(raw);
+
+  // Intensidad musical: presión de enemigos + un plus si estamos a oscuras.
+  const pressure = Math.min(1, game.zombies.length / 40) * 0.85 + (game.night ? 0.15 : 0);
+  audio.updateMusic(raw, game.state === 'playing' ? pressure : 0.1);
 
   for (const f of flashPool) {
     if (f.life <= 0) continue;

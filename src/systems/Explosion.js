@@ -18,6 +18,9 @@ export function explodeAt(game, pos, opts = {}) {
 
   game.particles.burst(pos, color, 24, { power: 16, size: 0.3, ttl: 0.8 });
   game.particles.burst(pos, 0x3a3a3a, 16, { power: 9, size: 0.22, ttl: 1.5 });
+  if (game.shockwaves) {
+    game.shockwaves.spawn(pos, color, { from: 0.5, to: radius * 1.1, ttl: 0.4, opacity: 0.7 });
+  }
   game.flashLight(pos, color, 90, 0.4);
   game.shake(shake);
   game.audio.explosion(radius / 6.5);

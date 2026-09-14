@@ -130,40 +130,48 @@ Por coste, de menor a mayor:
 
 ---
 
-## Próxima tanda pedida (sin empezar, priorizada)
+## Próxima tanda pedida (priorizada)
 
-1. **Fix del atasco en esquinas** — ver arriba, prioridad máxima.
-2. **Audio**: ajuste de los sonidos existentes (son parámetros de síntesis
-   en `Audio.js`, no archivos) + música de fondo — ambiente/tensión con
-   osciladores en bucle, stinger al limpiar ronda. Honesto: síntesis pura
-   da para ambiente/tensión, no para una banda sonora con melodía real —
-   eso exigiría pistas aportadas por el usuario.
-3. **Efectos visuales de Nova de Hielo y Pisar del Titán** — anillo de
-   onda expansiva con geometría propia (no solo partículas), grieta en el
-   suelo para el Titán (nuevo tipo de decal en `Decals.js`). Pulido sobre
-   sistemas existentes, sin arquitectura nueva.
-4. **Apagones periódicos** — cada X segundos de combate, aviso corto y
-   20-30s a oscuras forzando la linterna. Reutiliza el modo nocturno ya
-   existente (`setNight` en `main.js`); lo nuevo es el temporizador y el
-   aviso. Buena sinergia futura con el enemigo Volador (peligroso
-   precisamente por no verlo venir).
-5. **Barricadas** (arma que falta, la barata — ver §1 arriba).
+- [x] **1. Fix del atasco en esquinas** — `Zombie.js`: el deslizamiento ahora
+  fija UNA dirección de rodeo al bloquearse (wall-following real) en vez de
+  recalcularla cada frame contra el jugador; invierte de lado si no progresa
+  tras 0,8 s. Failsafe duro: >7 s de atasco acumulado → empujón directo hacia
+  el jugador ignorando muros. Además `Arena.randomSpawn` empuja el punto de
+  aparición fuera de cualquier muro/caja para no spawnear dentro de geometría.
+- [x] **2. Audio + música** — motor de música en `Audio.js` (clase `AudioKit`):
+  drone grave en dos capas desafinadas con un filtro cuyo brillo sube con la
+  intensidad (nº de enemigos), pulso de kick sintetizado que acelera con la
+  presión, y stinger de acorde ascendente al despejar oleada (`waveCleared`).
+  Bus de música propio bajo el master, se silencia con `M` como el resto.
+  Honesto: es tensión de arena, no melodía — para eso harían falta pistas
+  reales aportadas.
+- [x] **3. VFX de magias** — sistema `Shockwaves.js` (anillos de geometría
+  propia que crecen y se desvanecen, pool de 14). Nova de Hielo: doble anillo
+  + esquirlas sobre cada congelado. Pisar del Titán: onda de polvo + grieta
+  radial en el suelo (nuevo `Decals.crack`). Todas las explosiones ganan
+  también su anillo vía `explodeAt`.
+- [x] **4. Apagones automáticos** — `main.js`: máquina de estados
+  clear→warn→blackout. A partir de la oleada 6, cada 42 s la luz parpadea 2,5 s
+  de aviso y se corta 24 s obligando a la linterna. La tecla `L` sigue
+  funcionando como override manual (desactiva el ciclo automático).
+
+### Pendiente en esta tanda
+
+5. **Barricadas** (arma que falta, la barata — `Crate` colocable).
 6. **Torreta** (arma que falta, IA de apuntado propia).
 7. **Rifle de plasma** (arma que falta, la cara — rayo continuo, pide
    colisión segmento-contra-círculo que no existe).
-8. **Vórtice Gravitatorio y Círculo de Almas** (magias que faltan — ver §2
-   arriba, arquitectura nueva de verdad en ambos).
+8. **Vórtice Gravitatorio y Círculo de Almas** (magias que faltan —
+   arquitectura nueva de verdad en ambos).
 9. **Menú principal** — estado nuevo antes de `playing`, autocontenido.
-10. **Más mapas** (Tight/Columns/Reactor primero, Rooftop es el caro — ver
-    §4 arriba).
+10. **Más mapas** (Tight/Columns/Reactor primero, Rooftop es el caro).
 11. **Ruleta de selección de arma estilo GTA** (slowmo + blur + radial) —
-    la pieza de infraestructura más grande de toda esta tanda: el
-    proyecto no tiene absolutamente nada de postprocesado todavía, y el
-    blur de pantalla lo exige (`EffectComposer`). Cambiar de arma con
-    teclas numéricas ya funciona perfecto — esto es estética, no una
-    carencia funcional, candidato a ir el último de este bloque.
-12. **Enemigos nuevos** (Nigromante, Volador, Baba, Juggernaut) — sin
-    cambios respecto a §3 de este documento, el Volador sigue siendo el
-    ítem más caro de *toda* la lista combinada (primera vez con altura
-    real en Y).
+    requiere postprocesado (`EffectComposer`), que el proyecto aún no tiene.
+12. **Enemigos nuevos** (Nigromante, Volador, Baba, Juggernaut) — el Volador
+    sigue siendo el ítem más caro (primera vez con altura real en Y).
+
+> Nota tras esta tanda: los VFX de magia, los apagones y la música **no se han
+> podido verificar visual/sonoramente** (el entorno de desarrollo no tiene
+> navegador — solo build + smoke test por HTTP). Compilan y arrancan; el
+> comportamiento en pantalla habrá que confirmarlo jugando.
 

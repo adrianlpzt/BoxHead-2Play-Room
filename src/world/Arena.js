@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { makeBox, rand } from '../core/Collision.js';
+import { makeBox, rand, resolveCircleBox } from '../core/Collision.js';
 
 const VOXEL = 1.25;
 const VEL = new THREE.Vector3(); // vector de trabajo: Debris.spawn copia los valores
@@ -221,10 +221,14 @@ export class Arena {
         best = p;
       }
     }
-    return new THREE.Vector3(
+    const pos = new THREE.Vector3(
       best.x + (Math.random() - 0.5) * 5,
       0,
       best.z + (Math.random() - 0.5) * 5
     );
+    // Empuja el punto fuera de cualquier muro/caja: un zombi que aparezca dentro
+    // de geometría sólida queda inalcanzable a las balas y bloquea la ronda.
+    for (const w of this.walls) resolveCircleBox(pos, 0.8, w);
+    return pos;
   }
 }

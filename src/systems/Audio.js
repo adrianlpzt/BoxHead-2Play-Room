@@ -12,6 +12,15 @@ export class AudioKit {
     this.noise = null;
     this.muted = false;
     this.last = new Map(); // antirrebote por tipo de sonido
+
+    // Motor de música: bus propio, capas persistentes y estado de intensidad.
+    this.musicBus = null;
+    this.music = null;
+    this.musicOn = false;
+    this.intensity = 0;      // 0..1, sube con la presión de enemigos
+    this.targetIntensity = 0;
+    this.beatClock = 0;
+    this.beat = 0;
   }
 
   unlock() {
@@ -32,6 +41,12 @@ export class AudioKit {
     const data = buf.getChannelData(0);
     for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
     this.noise = buf;
+
+    // Bus de música, más bajo que los efectos para que no tape el gameplay.
+    this.musicBus = this.ctx.createGain();
+    this.musicBus.gain.value = 0.55;
+    this.musicBus.connect(this.master);
+    this.#startMusic();
   }
 
   toggleMute() {
@@ -190,5 +205,93 @@ export class AudioKit {
     if (!this.#ready('unlock', 0.3)) return;
     this.#tone({ type: 'square', from: 520, to: 520, dur: 0.09, gain: 0.2 });
     this.#tone({ type: 'square', from: 780, to: 780, dur: 0.14, gain: 0.2, delay: 0.09 });
+  }
+
+  // ----------------------------------------------------------- MÚSICA
+  /**
+   * Música de fondo 100% sintética, en dos capas persistentes:
+   *  - un drone grave (dos osciladores desafinados) que da la base ominosa,
+   *  - un filtro sobre el drone cuya apertura sube con la intensidad, así el
+   *    "brillo" del fondo crece cuando hay más enemigos sin cambiar de nota.
+   * Encima, un pulso rítmico (kick sintetizado) cuya frecuencia de golpe también
+   * escala con la intensidad. No es una melodía — es tensión de arena, honesto
+   * con lo que la síntesis pura puede dar bien.
+   */
+  #startMusic() {
+    if (this.musicOn || !this.ctx) return;
+    const t = this.ctx.currentTime;
+
+    // Drone: dos ondas graves ligeramente desafinadas → batido lento, inquietante.
+    const oscA = this.ctx.createOscillator();
+    const oscB = this.ctx.createOscillator();
+    oscA.type = 'sawtooth';
+    oscB.type = 'sawtooth';
+    oscA.frequency.value = 55;   // La grave
+    oscB.frequency.value = 55.4; // leve desafine
+
+    const droneFilter = this.ctx.createBiquadFilter();
+    droneFilter.type = 'lowpass';
+    droneFilter.frequency.value = 220;
+    droneFilter.Q.value = 6;
+
+    const droneGain = this.ctx.createGain();
+    droneGain.gain.value = 0.5;
+
+    oscA.connect(droneFilter);
+    oscB.connect(droneFilter);
+    droneFilter.connect(droneGain).connect(this.musicBus);
+    oscA.start(t);
+    oscB.start(t);
+
+    this.music = { oscA, oscB, droneFilter, droneGain };
+    this.musicOn = true;
+  }
+
+  /** Kick sintetizado para el pulso rítmico del fondo. */
+  #kick(gain) {
+    const t = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(120, t);
+    osc.frequency.exponentialRampToValueAtTime(40, t + 0.12);
+    const g = this.ctx.createGain();
+    g.gain.setValueAtTime(gain, t);
+    g.gain.exponentialRampToValueAtTime(0.0008, t + 0.16);
+    osc.connect(g).connect(this.musicBus);
+    osc.start(t);
+    osc.stop(t + 0.18);
+  }
+
+  /**
+   * Se llama cada frame desde main.js con la "presión" actual (0..1), típicamente
+   * derivada del número de enemigos vivos. Suaviza la intensidad y avanza el pulso.
+   */
+  updateMusic(dt, pressure) {
+    if (!this.musicOn || this.muted) return;
+    this.targetIntensity = Math.max(0, Math.min(1, pressure));
+    // Suavizado: la música no debe dar bandazos cuando el conteo oscila.
+    this.intensity += (this.targetIntensity - this.intensity) * Math.min(1, dt * 0.6);
+
+    // Brillo del drone: de apagado (240 Hz) a tenso (1200 Hz) con la intensidad.
+    const cutoff = 240 + this.intensity * 960;
+    this.music.droneFilter.frequency.setTargetAtTime(cutoff, this.ctx.currentTime, 0.3);
+
+    // Pulso: entre 1 golpe/1.1s en calma y ~1 golpe/0.4s en pánico.
+    const period = 1.1 - this.intensity * 0.7;
+    this.beatClock += dt;
+    if (this.beatClock >= period) {
+      this.beatClock = 0;
+      this.beat++;
+      this.#kick(0.18 + this.intensity * 0.22);
+    }
+  }
+
+  /** Cambio de ronda: acorde ascendente corto sobre la base. */
+  waveCleared() {
+    if (!this.ctx || this.muted) return;
+    const notes = [220, 277, 330, 440];
+    notes.forEach((f, i) => {
+      this.#tone({ type: 'triangle', from: f, to: f, dur: 0.5, gain: 0.16, delay: i * 0.12 });
+    });
   }
 }
