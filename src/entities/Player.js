@@ -192,6 +192,11 @@ export class Player {
       }
     }
 
+    // Clamp duro de límites: el dash no puede sacar al jugador del mapa.
+    const lim = game.arena.half - this.radius - 0.1;
+    this.position.x = Math.max(-lim, Math.min(lim, this.position.x));
+    this.position.z = Math.max(-lim, Math.min(lim, this.position.z));
+
     const dx = aimPoint.x - this.position.x;
     const dz = aimPoint.z - this.position.z;
     if (dx * dx + dz * dz > 0.01) {

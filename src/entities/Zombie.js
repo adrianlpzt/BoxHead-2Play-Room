@@ -375,6 +375,17 @@ export class Zombie {
       this.position.z += (dz / d) * push;
     }
 
+    // Clamp duro de límites de mundo. Red de seguridad definitiva: pase lo que
+    // pase antes (knockback de escopeta/explosión, failsafe de atasco, empujones
+    // de la separación), un zombi NUNCA puede salir del rectángulo jugable. Sin
+    // esto, un empujón fuerte cerca del borde lo saca por la cara exterior del
+    // muro y queda inalcanzable, bloqueando la ronda. Es lo que faltaba.
+    const lim = game.arena.half - this.radius - 0.1;
+    if (this.position.x > lim) this.position.x = lim;
+    else if (this.position.x < -lim) this.position.x = -lim;
+    if (this.position.z > lim) this.position.z = lim;
+    else if (this.position.z < -lim) this.position.z = -lim;
+
     // --- Animación y estado -------------------------------------------------
     this.walkPhase += dt * this.speed * 2.2;
     const sw = Math.sin(this.walkPhase) * 0.5;

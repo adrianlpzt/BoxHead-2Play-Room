@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { makeBox, rand, resolveCircleBox } from '../core/Collision.js';
+import { makeBox, rand } from '../core/Collision.js';
+import { MAPS } from './Maps.js';
 
 const VOXEL = 1.25;
 const VEL = new THREE.Vector3(); // vector de trabajo: Debris.spawn copia los valores
@@ -102,9 +103,10 @@ class Crate {
 }
 
 export class Arena {
-  constructor(scene, size = 56) {
+  constructor(scene, size = 56, mapDef = null) {
     this.size = size;
     this.half = size / 2;
+    this.map = mapDef || MAPS.box;
     this.walls = [];
     this.crates = [];
     this.group = new THREE.Group();
@@ -126,14 +128,14 @@ export class Arena {
     const c = document.createElement('canvas');
     c.width = c.height = 128;
     const g = c.getContext('2d');
-    g.fillStyle = '#2b2f38';
+    g.fillStyle = this.map.floor;
     g.fillRect(0, 0, 128, 128);
     for (let i = 0; i < 90; i++) {
       g.fillStyle = `rgba(255,255,255,${Math.random() * 0.035})`;
       const s = 4 + Math.random() * 16;
       g.fillRect(Math.random() * 128, Math.random() * 128, s, s);
     }
-    g.strokeStyle = '#1a1d24';
+    g.strokeStyle = this.map.floorLine;
     g.lineWidth = 6;
     g.strokeRect(0, 0, 128, 128);
     const tex = new THREE.CanvasTexture(c);
@@ -176,23 +178,39 @@ export class Arena {
     this.#addWallBox(0, o, s + t * 2, h, t);
     this.#addWallBox(-o, 0, t, h, s + t * 2);
     this.#addWallBox(o, 0, t, h, s + t * 2);
-    // Pilares centrales de hormigón: indestructibles, dan estructura al mapa.
-    this.#addWallBox(0, -9, 8, 2.6, 2.5, 0x4d525c);
-    this.#addWallBox(0, 9, 8, 2.6, 2.5, 0x4d525c);
+    // Pilares indestructibles según el mapa.
+    for (const [x, z, sx, sz] of this.map.pillars) {
+      this.#addWallBox(x, z, sx, 2.6, sz, this.map.pillarColor);
+    }
   }
 
   #buildCrates() {
-    const spots = [
-      [-14, -14, 5, 5],
-      [14, -14, 5, 5],
-      [-14, 14, 5, 5],
-      [14, 14, 5, 5],
-    ];
-    for (const [x, z, sx, sz] of spots) {
+    for (const [x, z, sx, sz] of this.map.crates) {
       const crate = new Crate(this.group, x, z, sx, sz, 2, 0x7a6a4f);
       this.crates.push(crate);
       this.walls.push(crate.box);
     }
+  }
+
+  /**
+   * Reconstruye la arena con otro mapa, reutilizando los MISMOS arrays walls y
+   * crates (los vacía in-place) para no romper la referencia game.walls que
+   * tiene main.js. Limpia la geometría anterior del grupo.
+   */
+  rebuild(mapDef) {
+    // Vaciar el grupo visual y liberar geometría.
+    for (let i = this.group.children.length - 1; i >= 0; i--) {
+      const o = this.group.children[i];
+      this.group.remove(o);
+      o.geometry?.dispose?.();
+    }
+    this.walls.length = 0;
+    this.crates.length = 0;
+    this.map = mapDef || MAPS.box;
+
+    this.#buildFloor();
+    this.#buildWalls();
+    this.#buildCrates();
   }
 
   /** Daño de área a todas las coberturas dentro del radio. */
@@ -242,9 +260,11 @@ export class Arena {
       0,
       best.z + (Math.random() - 0.5) * 5
     );
-    // Empuja el punto fuera de cualquier muro/caja: un zombi que aparezca dentro
-    // de geometría sólida queda inalcanzable a las balas y bloquea la ronda.
-    for (const w of this.walls) resolveCircleBox(pos, 0.8, w);
+    // Nace garantizadamente dentro del rectángulo jugable. El clamp de mundo en
+    // Zombie.update lo mantiene dentro después pase lo que pase.
+    const lim = this.half - 1.5;
+    pos.x = Math.max(-lim, Math.min(lim, pos.x));
+    pos.z = Math.max(-lim, Math.min(lim, pos.z));
     return pos;
   }
 }

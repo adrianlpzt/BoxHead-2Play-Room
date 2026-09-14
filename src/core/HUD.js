@@ -16,6 +16,7 @@ export class HUD {
     this.gameover = document.getElementById('gameover');
     this.finalWave = document.getElementById('final-wave');
     this.finalScore = document.getElementById('final-score');
+    this.rankResult = document.getElementById('rank-result');
     this.help = document.getElementById('help');
     this.dashFill = document.getElementById('dash-fill');
     this.dashText = document.getElementById('dash-text');
@@ -116,9 +117,18 @@ export class HUD {
     this.nightTag.classList.toggle('on', on);
   }
 
-  showGameOver(game) {
+  showGameOver(game, rank = -1, best = 0) {
     this.finalWave.textContent = game.waves.wave;
     this.finalScore.textContent = game.score;
+    if (rank === 0) {
+      this.rankResult.textContent = `¡Nuevo récord! (${best} puntos)`;
+      this.rankResult.hidden = false;
+    } else if (rank > 0) {
+      this.rankResult.textContent = `Entras en el ranking, puesto #${rank + 1}`;
+      this.rankResult.hidden = false;
+    } else {
+      this.rankResult.hidden = true;
+    }
     this.gameover.hidden = false;
   }
 

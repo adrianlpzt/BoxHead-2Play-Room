@@ -213,3 +213,68 @@ Por coste, de menor a mayor:
   muestra armas desbloqueadas. El "blur" es oscurecido + viñeta + backdrop-
   filter por CSS, no postprocesado (el desenfoque óptico real necesitaría
   `EffectComposer`, pendiente por si el CSS no convence en pantalla).
+
+---
+
+## Sesión menú/móvil/mapas
+
+- [x] **Bug spawn fuera del escenario — arreglado de raíz.** Una simulación de
+  100k spawns confirmó que el spawn NO era el culpable (0% caía fuera). El
+  problema real: no existía límite duro de mundo, así que un knockback fuerte
+  cerca del borde o el failsafe de atasco (que empuja atravesando geometría)
+  podían sacar a un zombi por la cara exterior del muro. Solución: **clamp duro
+  de límites** al final de `Zombie.update` y `Player.update` — nadie puede salir
+  del rectángulo jugable pase lo que pase. El spawn además nace con clamp dentro.
+- [x] **Menú de inicio** (`core/Menu.js`) — estado `menu` que envuelve el juego.
+  Partida nueva (pide nombre 1ª vez, persistente), Ranking, Multijugador
+  (placeholder honesto), Instrucciones. Game over rehecho con registro de
+  puntuación y botones reintentar/menú.
+- [x] **Ranking local** (`core/Ranking.js`) — top 10 en localStorage.
+- [x] **Controles táctiles / móvil** (`core/TouchControls.js`) — dos joysticks
+  flotantes (mover / apuntar-disparar) + botones Q/E/dash/ruleta. Auto-activa en
+  pantallas táctiles. SIN PROBAR en móvil real: funcional en código, el feeling
+  táctil está por confirmar.
+- [x] **Mapas distintos** (`world/Maps.js`) — 3 arenas: La Caja (original),
+  Templo (rejilla de columnas), Reactor (núcleo central). Selector en el menú,
+  `Arena.rebuild` reconstruye reutilizando los arrays existentes. El jugador se
+  empuja fuera de muros al arrancar (crítico en Reactor).
+
+## Pendiente / sin trabajar aún
+
+### Online (FASE PROPIA — no una feature suelta)
+Requiere servidor con estado (WebSocket) o P2P con host (WebRTC), netcode
+(reconciliación, interpolación), y separar simulación de render. Con 150 zombis
+mandar todo cada frame satura la red. Plan recomendado: empezar por **co-op P2P
+con host** (un jugador es la autoridad) antes que servidor autoritativo. Semanas
+de trabajo hecho bien; se aborda como fase, no intercalado.
+
+### Roguelike mode (NUEVO — a diseñar)
+Idea a desarrollar: una tirada = varias oleadas con **mejoras elegibles entre
+rondas** (subir cadencia, vida máxima, daño explosivo, velocidad de dash…),
+muerte permanente, y quizá modificadores de arena aleatorios (más oscuridad, más
+demonios, barriles infinitos). Encaja bien con lo que ya hay: el combo, los
+apagones y los arquetipos dan variables de sobra para escalar. Decisiones
+abiertas: ¿mejoras con carta a elegir 1 de 3 estilo Vampire Survivors / Slay the
+Spire? ¿run corre en un mapa fijo o rota? ¿las mejoras son la progresión o
+conviven con el desbloqueo por combo actual?
+
+### ¿Comprar armas al final de ronda vs. el sistema actual? (a decidir)
+Pregunta de Adrián. Mi lectura honesta como diseño:
+
+- **Sistema actual (desbloqueo + munición por combo):** premia jugar bien EN
+  TIEMPO REAL. Mantener la cadena es lo que te da el arsenal y las balas. Es
+  tenso, inmediato, y muy fiel al arcade original de Boxhead. Contra: si pierdes
+  el combo en una oleada mala, te quedas seco y entras en espiral (ya mitigado
+  con los pickups de suelo).
+- **Comprar entre rondas (tienda):** premia la ESTRATEGIA. Acumulas puntos como
+  moneda y decides en qué gastarlos en la pausa entre oleadas. Da control y
+  planificación, reduce la frustración del "me quedé sin nada", y es la base
+  natural para el roguelike (la tienda ES el momento de mejora). Contra: rompe
+  el ritmo arcade, mete una pantalla de menú cada ronda, y quita algo de la
+  tensión de "gestiono la munición mientras me comen".
+
+**Mi recomendación:** no elegir uno u otro globalmente, sino por MODO. El modo
+arcade actual se queda como está (es coherente y bueno). El **roguelike estrena
+la tienda/mejoras entre rondas** — ahí la compra tiene todo el sentido y no
+canibaliza el arcade. Así cada modo tiene su identidad económica en vez de un
+compromiso tibio para ambos.

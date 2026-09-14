@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
   <title>Boxhead 3D — 2Play Rooms</title>
 </head>
 <body>
@@ -41,7 +41,11 @@
     <div id="gameover" hidden>
       <h1>Te han comido</h1>
       <p>Aguantaste hasta la oleada <b id="final-wave">0</b> con <b id="final-score">0</b> puntos.</p>
-      <p class="hint">Pulsa <kbd>R</kbd> para volver a empezar</p>
+      <p id="rank-result" class="rank-result" hidden></p>
+      <div class="gameover-actions">
+        <button id="btn-retry" class="menu-btn primary">Reintentar (R)</button>
+        <button id="btn-menu" class="menu-btn ghost">Menú principal</button>
+      </div>
     </div>
 
     <div id="help">

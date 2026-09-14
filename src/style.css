@@ -247,3 +247,195 @@ body.night { --ink-dim: #6f7a86; }
   color: var(--toxic);
   font-variant-numeric: tabular-nums;
 }
+
+/* -------------------------------------------------------------- Menú de inicio */
+#menu {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  background: radial-gradient(circle at 50% 35%, rgba(20,16,16,0.82) 0%, rgba(6,7,10,0.94) 75%);
+  z-index: 10;
+}
+#menu[hidden] { display: none; }
+
+.menu-panel {
+  min-width: 340px;
+  max-width: 460px;
+  padding: 36px 40px;
+  text-align: center;
+}
+.menu-title {
+  font-size: 64px;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 0.9;
+  color: var(--ink);
+  text-shadow: 0 4px 0 rgba(0,0,0,0.5);
+}
+.menu-title span { color: var(--blood); }
+.menu-sub {
+  margin-top: 6px;
+  font-size: 14px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.menu-nav { margin-top: 34px; display: flex; flex-direction: column; gap: 10px; }
+
+.menu-btn {
+  pointer-events: auto;
+  padding: 13px 20px;
+  font-family: inherit;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
+  background: rgba(18, 21, 27, 0.9);
+  border: 1px solid rgba(232, 228, 217, 0.2);
+  cursor: pointer;
+  transition: background 0.12s ease, border-color 0.12s ease, transform 0.06s ease;
+}
+.menu-btn:hover { background: rgba(34, 40, 50, 0.95); border-color: rgba(232,228,217,0.4); }
+.menu-btn:active { transform: translateY(1px); }
+.menu-btn.primary { background: var(--blood); border-color: transparent; }
+.menu-btn.primary:hover { background: #e0492f; }
+.menu-btn.ghost { background: transparent; border-color: transparent; color: var(--ink-dim); }
+.menu-btn.ghost:hover { color: var(--ink); }
+
+.menu-h2 { font-size: 32px; font-weight: 700; color: var(--ink); margin-bottom: 20px; }
+.menu-text { font-size: 15px; line-height: 1.6; color: var(--ink); margin-bottom: 12px; }
+.menu-text.dim { color: var(--ink-dim); font-size: 13px; }
+.menu-text b { color: var(--toxic); }
+
+.rank-list { list-style: none; margin: 0 0 20px; padding: 0; }
+.rank-row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto auto;
+  gap: 12px;
+  align-items: baseline;
+  padding: 8px 4px;
+  border-bottom: 1px solid rgba(232, 228, 217, 0.1);
+  font-size: 15px;
+}
+.rank-row.top { color: var(--amber); }
+.rank-pos { color: var(--ink-dim); font-size: 13px; }
+.rank-name { text-align: left; font-weight: 600; }
+.rank-wave { color: var(--ink-dim); font-size: 13px; }
+.rank-score { font-weight: 700; font-variant-numeric: tabular-nums; }
+.rank-empty { color: var(--ink-dim); padding: 24px 0; }
+
+.menu-help { max-width: 520px; }
+.help-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 18px;
+  text-align: left;
+  margin-bottom: 18px;
+  font-size: 14px;
+}
+.help-grid > div:nth-child(odd) { color: var(--toxic); text-align: right; white-space: nowrap; }
+.help-grid > div:nth-child(even) { color: var(--ink); }
+
+/* Entrada de nombre al conseguir una puntuación de récord */
+#nameentry {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+}
+#nameentry input {
+  padding: 10px 14px;
+  font-family: inherit;
+  font-size: 18px;
+  text-align: center;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: rgba(10,12,16,0.9);
+  border: 1px solid rgba(232,228,217,0.3);
+  width: 200px;
+}
+#nameentry input:focus { outline: none; border-color: var(--toxic); }
+
+.gameover-actions { display: flex; gap: 12px; margin-top: 20px; }
+.rank-result { color: var(--amber); font-weight: 700; font-size: 18px; margin-top: 6px; }
+.rank-result[hidden] { display: none; }
+
+/* --------------------------------------------------------- Controles táctiles */
+#touch { position: absolute; inset: 0; pointer-events: none; display: none; }
+#touch.on.playing { display: block; }
+
+body.touch-device { touch-action: none; -webkit-user-select: none; user-select: none; }
+
+.stick {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  margin: -60px 0 0 -60px;
+  border-radius: 50%;
+  border: 2px solid rgba(232, 228, 217, 0.25);
+  background: rgba(10, 12, 16, 0.35);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.stick.active { opacity: 1; }
+.stick span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 52px;
+  height: 52px;
+  margin: -26px 0 0 -26px;
+  border-radius: 50%;
+  background: rgba(155, 209, 74, 0.55);
+  border: 2px solid rgba(232, 228, 217, 0.5);
+}
+
+.touch-buttons {
+  position: absolute;
+  right: 16px;
+  bottom: 150px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: auto;
+}
+.touch-buttons button {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  font-family: inherit;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+  background: rgba(18, 21, 27, 0.8);
+  border: 1px solid rgba(232, 228, 217, 0.3);
+}
+.touch-buttons button:active { background: var(--toxic); color: #0b0d12; }
+
+/* En móvil, la ayuda de teclado y algunos bloques del HUD estorban. */
+@media (pointer: coarse) {
+  #help { display: none; }
+  .hud-run { font-size: 11px; }
+}
+
+/* Selector de mapa en el menú */
+.map-select { margin-top: 24px; }
+.map-label { font-size: 12px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--ink-dim); margin-bottom: 8px; }
+.map-chips { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.map-chip {
+  padding: 7px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--ink-dim);
+  background: rgba(18, 21, 27, 0.8);
+  border: 1px solid rgba(232, 228, 217, 0.15);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+.map-chip:hover { color: var(--ink); }
+.map-chip.sel { color: #0b0d12; background: var(--toxic); border-color: transparent; font-weight: 600; }

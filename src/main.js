@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import './style.css';
 
 import { Arena } from './world/Arena.js';
+import { MAPS, MAP_ORDER } from './world/Maps.js';
 import { Player } from './entities/Player.js';
 import { Barrel } from './entities/Barrel.js';
 import { Mine } from './entities/Mine.js';
@@ -20,9 +21,12 @@ import { AudioKit } from './systems/Audio.js';
 import { Input } from './core/Input.js';
 import { HUD } from './core/HUD.js';
 import { WeaponWheel } from './core/WeaponWheel.js';
+import { Menu } from './core/Menu.js';
+import { Ranking } from './core/Ranking.js';
+import { TouchControls } from './core/TouchControls.js';
 import { CameraRig } from './core/CameraRig.js';
 import { SpatialHash } from './core/SpatialHash.js';
-import { circleHitsBox, distXZ } from './core/Collision.js';
+import { circleHitsBox, distXZ, resolveCircleBox } from './core/Collision.js';
 
 const ARENA_SIZE = 56;
 const MAX_HITSTOP = 0.075; // tope duro: encadenar congelaciones sentiría lag, no impacto
@@ -76,6 +80,8 @@ let flashCursor = 0;
 
 // ------------------------------------------------------------------ juego
 const arena = new Arena(scene, ARENA_SIZE);
+let currentMap = localStorage.getItem('boxhead3d.map') || 'box';
+if (!MAP_ORDER.includes(currentMap)) currentMap = 'box';
 const decals = new Decals(scene, ARENA_SIZE, 1024);
 const particles = new Particles(scene, 900);
 const debris = new Debris(scene, 420);
@@ -86,8 +92,31 @@ const grenades = new Grenades(scene, 16);
 const shockwaves = new Shockwaves(scene, 14);
 const player = new Player(scene);
 const input = new Input(canvas);
+const touch = new TouchControls(input);
+const isTouch = TouchControls.isTouch();
+if (isTouch) touch.enable();
 const hud = new HUD();
 const wheel = new WeaponWheel();
+const ranking = new Ranking();
+let pendingName = localStorage.getItem('boxhead3d.name') || '';
+const menu = new Menu(ranking, {
+  onPlay: (name, mapId) => {
+    pendingName = name;
+    if (mapId && MAP_ORDER.includes(mapId)) {
+      currentMap = mapId;
+      localStorage.setItem('boxhead3d.map', mapId);
+    }
+    startGame();
+  },
+});
+
+// Botones de la pantalla de fin de partida.
+document.getElementById('btn-retry').onclick = () => {
+  if (game.state === 'over') resetGame();
+};
+document.getElementById('btn-menu').onclick = () => {
+  if (game.state === 'over') returnToMenu();
+};
 const audio = new AudioKit();
 const grid = new SpatialHash(2);
 
@@ -123,7 +152,7 @@ const game = {
   unlockedSpells: new Set(),
   spellCooldowns: { stomp: 0, frostnova: 0 },
   bestMultiplier: 1,
-  state: 'playing',
+  state: 'menu',
   trauma: 0,
   night: false,
   crowded: false,
@@ -191,7 +220,11 @@ const game = {
   onPlayerDeath() {
     this.state = 'over';
     this.shake(0.8);
-    hud.showGameOver(this);
+    // Registra la puntuación en el ranking local antes de mostrar el game over.
+    const rank = ranking.qualifies(this.score)
+      ? ranking.add(pendingName, this.score, this.waves.wave)
+      : -1;
+    hud.showGameOver(this, rank, ranking.best);
   },
 };
 
@@ -512,6 +545,9 @@ function resetGame() {
   shells.clear();
   decals.clear();
   player.reset();
+  // En mapas con obstáculo central (Reactor), (0,0) puede caer dentro de un
+  // pilar. Empujamos al jugador fuera de cualquier muro antes de empezar.
+  for (const w of game.walls) resolveCircleBox(player.position, player.radius, w);
 
   game.score = 0;
   game.combo = 0;
@@ -536,6 +572,22 @@ function resetGame() {
   hud.hideGameOver();
 }
 
+/** Arranca una partida nueva desde el menú. */
+function startGame() {
+  menu.hide();
+  // Reconstruye la arena con el mapa elegido (reutiliza los arrays walls/crates).
+  arena.rebuild(MAPS[currentMap]);
+  decals.clear();
+  resetGame();
+}
+
+/** Vuelve al menú principal desde el game over. */
+function returnToMenu() {
+  hud.hideGameOver();
+  game.state = 'menu';
+  menu.show();
+}
+
 // -------------------------------------------------------------------- loop
 const clock = new THREE.Clock();
 
@@ -547,6 +599,12 @@ function tick() {
   if (hitstop > 0) {
     hitstop -= raw;
     dt = 0;
+  }
+
+  // Vuelca el estado de los joysticks táctiles en el Input (si hay táctil).
+  if (isTouch) {
+    touch.apply();
+    touch.root.classList.toggle('playing', game.state === 'playing');
   }
 
   // Ruleta de armas: mantener Tab la abre y ralentiza el tiempo; soltar selecciona.
@@ -574,7 +632,9 @@ function tick() {
   }
   if (input.tapped('KeyM')) hud.showBanner(audio.toggleMute() ? 'Sonido apagado' : 'Sonido activo', 1.2);
 
-  if (game.state === 'over') {
+  if (game.state === 'menu') {
+    // Solo se renderiza el fondo; el menú es DOM y gestiona sus clics.
+  } else if (game.state === 'over') {
     if (input.tapped('KeyR')) resetGame();
   } else if (dt > 0) {
     game.crowded = game.zombies.length > 60;

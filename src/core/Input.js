@@ -12,6 +12,8 @@ export class Input {
     this.fireDown = false;
     this.fireTapped = false;
     this.altTapped = false; // clic derecho
+    this.touchMove = { x: 0, z: 0, active: false, mag: 0 };
+    this._touchFiring = false;
 
     window.addEventListener('keydown', (e) => {
       if (!this.keys.has(e.code)) this.justPressed.add(e.code);
@@ -52,8 +54,14 @@ export class Input {
     return this.justPressed.has(code);
   }
 
-  /** Vector de movimiento normalizado en XZ a partir de WASD. */
+  /** Vector de movimiento normalizado en XZ a partir de WASD o del joystick táctil. */
   moveVector(out) {
+    // Prioridad al táctil cuando el joystick de movimiento está activo.
+    if (this.touchMove && this.touchMove.active) {
+      out.set(this.touchMove.x, 0, this.touchMove.z);
+      if (out.lengthSq() > 1) out.normalize();
+      return out;
+    }
     let x = 0;
     let z = 0;
     if (this.pressed('KeyW') || this.pressed('ArrowUp')) z -= 1;
