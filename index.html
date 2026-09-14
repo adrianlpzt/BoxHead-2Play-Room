@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Boxhead 3D — 2Play Rooms</title>
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <div id="hud">
+    <section class="hud-block hud-life">
+      <div class="bar bar-life"><span id="health-fill"></span></div>
+      <p class="readout"><span id="health-text">100</span> de vida</p>
+      <div class="bar bar-dash"><span id="dash-fill"></span></div>
+      <p class="readout" id="dash-text">Esquiva lista</p>
+    </section>
+
+    <section class="hud-block hud-combo">
+      <p id="combo-mult">x1</p>
+      <div class="bar bar-combo"><span id="combo-fill"></span></div>
+      <p class="readout"><span id="kills">0</span> bajas seguidas</p>
+    </section>
+
+    <section class="hud-block hud-run">
+      <p class="readout">Oleada <b id="wave">0</b></p>
+      <p class="readout">Puntos <b id="score">0</b></p>
+      <p class="readout">Enemigos <b id="alive">0</b></p>
+    </section>
+
+    <section class="hud-block hud-arsenal" id="weapons"></section>
+
+    <p id="banner"></p>
+
+    <div id="gameover" hidden>
+      <h1>Te han comido</h1>
+      <p>Aguantaste hasta la oleada <b id="final-wave">0</b> con <b id="final-score">0</b> puntos.</p>
+      <p class="hint">Pulsa <kbd>R</kbd> para volver a empezar</p>
+    </div>
+
+    <div id="help">
+      <p><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> moverse · ratón apuntar · clic o <kbd>espacio</kbd> disparar</p>
+      <p><kbd>1</kbd>–<kbd>4</kbd> cambiar arma · <kbd>B</kbd> o clic derecho soltar barril</p>
+      <p><kbd>Shift</kbd> esquivar (y patear barriles) · <kbd>L</kbd> apagar las luces</p>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
