@@ -13,6 +13,7 @@ import { Debris } from './systems/Debris.js';
 import { Decals } from './systems/Decals.js';
 import { Fireballs } from './systems/Fireballs.js';
 import { Grenades } from './systems/Grenades.js';
+import { SPELLS, SPELL_ORDER, SPELL_CAST } from './systems/Spells.js';
 import { AudioKit } from './systems/Audio.js';
 import { Input } from './core/Input.js';
 import { HUD } from './core/HUD.js';
@@ -111,6 +112,10 @@ const game = {
   weapon: 'pistol',
   unlocked: new Set(['pistol']),
   ammo: { pistol: Infinity, shotgun: 12, uzi: 90, barrel: 2, mine: 2, grenade: 3, rocket: 1 },
+  essence: 20,
+  maxEssence: 100,
+  unlockedSpells: new Set(),
+  spellCooldowns: { stomp: 0, frostnova: 0 },
   bestMultiplier: 1,
   state: 'playing',
   trauma: 0,
@@ -151,6 +156,8 @@ const game = {
 
     if (this.multiplier > this.bestMultiplier) this.bestMultiplier = this.multiplier;
     unlockByMultiplier(this.multiplier);
+    unlockSpellByMultiplier(this.multiplier);
+    this.essence = Math.min(this.maxEssence, this.essence + 2 + this.multiplier * 0.6);
     maybeDrop(zombie);
   },
 
@@ -191,11 +198,28 @@ function unlockByMultiplier(mult) {
   }
 }
 
+function unlockSpellByMultiplier(mult) {
+  for (const id of SPELL_ORDER) {
+    const s = SPELLS[id];
+    if (!game.unlockedSpells.has(id) && mult >= s.unlockAt) {
+      game.unlockedSpells.add(id);
+      hud.showBanner(`${s.name} desbloqueada`, 1.6);
+      audio.unlockWeapon();
+    }
+  }
+}
+
 /**
  * Sueltas ponderadas por escasez. Es el seguro contra la espiral de munición:
  * cuanto más seco estás, más probable es que caiga justo lo que te falta.
  */
 function maybeDrop(zombie) {
+  // Los orbes de esencia son un roll aparte y más generoso: la magia se
+  // alimenta de jugar bien, no de la escasez como la munición.
+  if (Math.random() < 0.22) {
+    game.pickups.push(new Pickup(scene, zombie.position, 'essence'));
+  }
+
   const dry = game.ammo.shotgun < 6 && game.ammo.uzi < 25;
   const chance = dry ? 0.5 : 0.14;
   if (Math.random() > chance) return;
@@ -296,6 +320,15 @@ function throwGrenade() {
   if (game.ammo.grenade <= 0) selectWeapon('pistol');
 }
 
+function castSpell(id) {
+  const s = SPELLS[id];
+  if (!game.unlockedSpells.has(id)) return;
+  if (game.spellCooldowns[id] > 0 || game.essence < s.cost) return;
+  game.essence -= s.cost;
+  game.spellCooldowns[id] = s.cooldown;
+  SPELL_CAST[id](game);
+}
+
 function handleShooting() {
   const id = game.weapon;
   const w = WEAPONS[id];
@@ -384,6 +417,9 @@ function resetGame() {
   game.weapon = 'pistol';
   game.unlocked = new Set(['pistol']);
   game.ammo = { pistol: Infinity, shotgun: 12, uzi: 90, barrel: 2, mine: 2, grenade: 3, rocket: 1 };
+  game.essence = 20;
+  game.unlockedSpells = new Set();
+  game.spellCooldowns = { stomp: 0, frostnova: 0 };
   game.trauma = 0;
   game.state = 'playing';
   hitstop = 0;
@@ -424,6 +460,8 @@ function tick() {
     }
     if (input.altTapped) placeBarrel();
     if (input.tapped('ShiftLeft') || input.tapped('ShiftRight')) player.dash(moveDir, game);
+    if (input.tapped('KeyQ')) castSpell('stomp');
+    if (input.tapped('KeyE')) castSpell('frostnova');
 
     player.update(dt, moveDir, aimPoint, game);
     handleShooting();
@@ -455,6 +493,10 @@ function tick() {
         game.combo = 0;
         game.multiplier = 1;
       }
+    }
+
+    for (const id of SPELL_ORDER) {
+      if (game.spellCooldowns[id] > 0) game.spellCooldowns[id] -= dt;
     }
 
     waves.update(dt);

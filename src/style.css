@@ -72,6 +72,26 @@ html, body {
 /* Marcador — arriba a la derecha */
 .hud-run { top: 18px; right: 22px; text-align: right; line-height: 1.55; }
 
+/* Magia — izquierda, entre la vida y el borde superior */
+.hud-magic { left: 22px; bottom: 118px; width: 190px; }
+.bar-essence { height: 8px; }
+#essence-fill { background: #6fd8f0; }
+.hud-magic .readout { margin: 4px 0 6px; }
+#spells { display: flex; gap: 6px; }
+.spell {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 5px 8px;
+  background: var(--panel);
+  font-size: 11px;
+  color: var(--ink-dim);
+  border-bottom: 3px solid transparent;
+  min-width: 64px;
+}
+.spell .key { font-size: 13px; color: var(--ink); font-weight: 700; }
+.spell.locked { opacity: 0.3; }
+.spell.ready:not(.locked) { border-bottom-color: #6fd8f0; color: var(--ink); }
+.spell.cooling .key { color: var(--ink-dim); }
+
 /* Arsenal — abajo a la derecha */
 .hud-arsenal { right: 22px; bottom: 22px; display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
 .slot {

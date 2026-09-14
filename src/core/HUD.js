@@ -1,4 +1,5 @@
 import { WEAPON_ORDER, WEAPONS } from '../systems/Weapons.js';
+import { SPELL_ORDER, SPELLS } from '../systems/Spells.js';
 import { DASH_COOLDOWN_TIME } from '../entities/Player.js';
 
 export class HUD {
@@ -37,6 +38,18 @@ export class HUD {
       host.appendChild(el);
       this.slots[id] = { root: el, ammo: el.querySelector('.ammo') };
     });
+
+    this.essenceFill = document.getElementById('essence-fill');
+    const spellHost = document.getElementById('spells');
+    this.spellSlots = {};
+    SPELL_ORDER.forEach((id) => {
+      const s = SPELLS[id];
+      const el = document.createElement('div');
+      el.className = 'spell locked';
+      el.innerHTML = `<span class="key">${s.key}</span><span class="name">${s.name}</span><span class="cost">${s.cost}</span>`;
+      spellHost.appendChild(el);
+      this.spellSlots[id] = el;
+    });
   }
 
   showBanner(text, seconds = 2) {
@@ -74,6 +87,18 @@ export class HUD {
       s.root.classList.toggle('active', unlocked && game.weapon === id);
       s.root.classList.toggle('empty', unlocked && ammo === 0);
       s.ammo.textContent = !unlocked ? '—' : ammo === Infinity ? '∞' : ammo;
+    }
+
+    this.essenceFill.style.transform = `scaleX(${game.essence / game.maxEssence})`;
+    for (const id of SPELL_ORDER) {
+      const cfg = SPELLS[id];
+      const el = this.spellSlots[id];
+      const unlocked = game.unlockedSpells.has(id);
+      const cooling = game.spellCooldowns[id] > 0;
+      const affordable = game.essence >= cfg.cost;
+      el.classList.toggle('locked', !unlocked);
+      el.classList.toggle('cooling', unlocked && (cooling || !affordable));
+      el.classList.toggle('ready', unlocked && !cooling && affordable);
     }
 
     if (this.bannerTimer > 0) {

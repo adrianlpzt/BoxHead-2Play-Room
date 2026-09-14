@@ -124,6 +124,27 @@ export class AudioKit {
     this.#burst({ gain: 0.2, dur: 0.07, type: 'bandpass', from: 1400, to: 600, q: 3 });
   }
 
+  /** Crítico garantizado sobre un enemigo congelado por la Nova de Hielo. */
+  shatter() {
+    if (!this.#ready('shatter', 0.04)) return;
+    this.#burst({ gain: 0.45, dur: 0.22, type: 'highpass', from: 5200, to: 2800, q: 4 });
+    this.#tone({ type: 'triangle', from: 1800, to: 3200, dur: 0.12, gain: 0.18 });
+  }
+
+  /** Onda expansiva de la Nova de Hielo: silbido grave descendente y corto. */
+  frostNova() {
+    if (!this.#ready('nova', 0.15)) return;
+    this.#burst({ gain: 0.5, dur: 0.4, type: 'lowpass', from: 3000, to: 400 });
+    this.#tone({ type: 'sine', from: 900, to: 220, dur: 0.35, gain: 0.28 });
+  }
+
+  /** Pisotón del Titán: impacto sordo con un breve estruendo de suelo. */
+  titanStomp() {
+    if (!this.#ready('stomp', 0.2)) return;
+    this.#burst({ gain: 0.7, dur: 0.3, type: 'lowpass', from: 900, to: 90 });
+    this.#tone({ type: 'sine', from: 70, to: 32, dur: 0.28, gain: 0.5 });
+  }
+
   explosion(scale = 1) {
     if (!this.#ready('boom', 0.05)) return;
     this.#burst({ gain: 0.95, dur: 0.65 * scale, type: 'lowpass', from: 1400, to: 70 });

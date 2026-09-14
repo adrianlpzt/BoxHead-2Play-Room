@@ -8,6 +8,7 @@ export const PICKUP_TYPES = {
   mine: { color: 0x995a4a, label: 'mina', amount: 1 },
   grenade: { color: 0x8fae4a, label: 'granada', amount: 1 },
   rocket: { color: 0xff6a3b, label: 'cohete', amount: 1 },
+  essence: { color: 0x9fe0f0, label: 'esencia', amount: 18 },
   health: { color: 0x62d67a, label: 'botiquín', amount: 30 },
 };
 
@@ -65,6 +66,8 @@ export class Pickup {
     this.dead = true;
     if (this.kind === 'health') {
       game.player.hp = Math.min(game.player.maxHp, game.player.hp + this.cfg.amount);
+    } else if (this.kind === 'essence') {
+      game.essence = Math.min(game.maxEssence, game.essence + this.cfg.amount);
     } else {
       game.unlocked.add(this.kind);
       game.ammo[this.kind] += this.cfg.amount;

@@ -37,6 +37,11 @@ for (const [type, cfg] of Object.entries(ENEMY_TYPES)) {
 // Material único de destello: el impacto se marca cambiando de material, no
 // tocando el emissive de un material propio por enemigo.
 const FLASH = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0xff5544 });
+// Congelado: tinte cian traslúcido. Prioridad visual sobre el destello de golpe
+// mientras dura, porque estar congelado ya comunica "esto acaba de recibir algo".
+const FROZEN = new THREE.MeshLambertMaterial({
+  color: 0xaee4f2, emissive: 0x1c4a5a, emissiveIntensity: 0.5,
+});
 
 const box = (w, h, d, mat) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
 
@@ -60,6 +65,8 @@ export class Zombie {
     this.attackCd = 0;
     this.flash = 0;
     this.flashing = false;
+    this.frozen = false;
+    this.frozenUntil = 0;
     this.bleedTimer = 0;
     this.walkPhase = rand(0, 6.28);
     this.knock = new THREE.Vector3();
@@ -145,10 +152,18 @@ export class Zombie {
     return true;
   }
 
+  /** Nova de Hielo: inmoviliza y prepara el shatter-crit en el próximo impacto. */
+  freeze(seconds) {
+    if (this.dead) return;
+    this.frozen = true;
+    this.frozenUntil = Math.max(this.frozenUntil, seconds);
+    for (const p of Object.values(this.parts)) p.material = FROZEN;
+  }
+
   takeDamage(amount, game, fromDir = null, opts = {}) {
     if (this.dead) return 'hit';
 
-    if (this.type === 'armored' && !opts.explosive && fromDir && this.parts.plate?.visible) {
+    if (this.type === 'armored' && !this.frozen && !opts.explosive && fromDir && this.parts.plate?.visible) {
       const f = this.facing();
       if (fromDir.x * f.x + fromDir.z * f.z < -0.4) {
         vHit.set(this.position.x, 1.2, this.position.z);
@@ -159,29 +174,40 @@ export class Zombie {
       }
     }
 
-    this.hp -= amount;
-    this.#setFlash(true);
-    this.flash = 0.1;
+    const shatter = this.frozen;
+    const dealt = shatter ? amount * 3 : amount;
+    this.hp -= dealt;
     if (fromDir) this.knock.addScaledVector(fromDir, opts.knock ?? 3);
 
-    vHit.set(this.position.x, 1.2, this.position.z);
-    game.particles.burst(vHit, this.cfg.skin, 3, { power: 5, size: 0.15, ttl: 0.6 });
-    if (this.bleedTimer <= 0) {
-      game.decals.blood(this.position, 0.5, this.cfg.blood);
-      this.bleedTimer = 0.25;
-    }
-    if (!opts.explosive) game.audio.hit();
+    if (shatter) {
+      // Congelado y roto: crítico garantizado, partículas de hielo en vez de carne,
+      // sin el destello blanco normal (el tinte cian ya comunica "esto acaba de pasar algo").
+      vHit.set(this.position.x, 1.2, this.position.z);
+      game.particles.burst(vHit, 0xbfeaf5, 8, { power: 7, size: 0.17, ttl: 0.6 });
+      game.audio.shatter();
+    } else {
+      this.#setFlash(true);
+      this.flash = 0.1;
 
-    if (this.hp > 0 && amount >= 30 && Math.random() < 0.3) {
-      const a = this.parts.armL.visible ? 'armL' : this.parts.armR.visible ? 'armR' : null;
-      if (a) {
-        this.detach(a, game, fromDir);
-        game.audio.gib();
+      vHit.set(this.position.x, 1.2, this.position.z);
+      game.particles.burst(vHit, this.cfg.skin, 3, { power: 5, size: 0.15, ttl: 0.6 });
+      if (this.bleedTimer <= 0) {
+        game.decals.blood(this.position, 0.5, this.cfg.blood);
+        this.bleedTimer = 0.25;
+      }
+      if (!opts.explosive) game.audio.hit();
+
+      if (this.hp > 0 && amount >= 30 && Math.random() < 0.3) {
+        const a = this.parts.armL.visible ? 'armL' : this.parts.armR.visible ? 'armR' : null;
+        if (a) {
+          this.detach(a, game, fromDir);
+          game.audio.gib();
+        }
       }
     }
 
     if (this.hp <= 0) {
-      this.die(game, fromDir, opts);
+      this.die(game, fromDir, { ...opts, shatter });
       return 'kill';
     }
     return 'hit';
@@ -190,14 +216,16 @@ export class Zombie {
   die(game, dir = null, opts = {}) {
     if (this.dead) return;
     this.dead = true;
-    game.decals.blood(this.position, 1.5 * this.cfg.scale, this.cfg.blood);
+    if (!opts.shatter) game.decals.blood(this.position, 1.5 * this.cfg.scale, this.cfg.blood);
     vHit.set(this.position.x, 1, this.position.z);
+
+    const burstColor = opts.shatter ? 0xbfeaf5 : this.cfg.skin;
 
     if (this.type === 'bomber') {
       game.corpses.push(new BomberCorpse(game.scene, this.position));
-      game.particles.burst(vHit, this.cfg.skin, 10, { power: 6, size: 0.2 });
+      game.particles.burst(vHit, burstColor, 10, { power: 6, size: 0.2 });
     } else {
-      game.particles.burst(vHit, this.cfg.skin, 12, { power: 9, size: 0.2 });
+      game.particles.burst(vHit, burstColor, 12, { power: 9, size: 0.2 });
       const order = ['head', 'hair', 'armL', 'armR', 'legL', 'legR', 'torso', 'plate', 'helm'];
       for (const name of order) this.detach(name, game, dir);
       game.audio.gib();
@@ -231,6 +259,16 @@ export class Zombie {
 
   update(dt, game) {
     if (this.dead) return;
+
+    if (this.frozen) {
+      this.frozenUntil -= dt;
+      if (this.frozenUntil <= 0) {
+        this.frozen = false;
+        for (const p of Object.values(this.parts)) p.material = p.userData.base;
+      } else {
+        return; // inmóvil mientras dura la congelación
+      }
+    }
 
     const target = game.player.position;
     const dx = target.x - this.position.x;
