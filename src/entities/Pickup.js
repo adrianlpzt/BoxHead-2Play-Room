@@ -6,6 +6,8 @@ export const PICKUP_TYPES = {
   uzi: { color: 0xbfe7ff, label: 'munición de uzi', amount: 45 },
   barrel: { color: 0xc0392b, label: 'barril', amount: 1 },
   mine: { color: 0x995a4a, label: 'mina', amount: 1 },
+  barricade: { color: 0x8a7a52, label: 'barricada', amount: 1 },
+  turret: { color: 0x5a6678, label: 'torreta', amount: 1 },
   grenade: { color: 0x8fae4a, label: 'granada', amount: 1 },
   rocket: { color: 0xff6a3b, label: 'cohete', amount: 1 },
   essence: { color: 0x9fe0f0, label: 'esencia', amount: 18 },

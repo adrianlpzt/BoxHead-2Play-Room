@@ -196,6 +196,7 @@ export class Arena {
   }
 
   /** Daño de área a todas las coberturas dentro del radio. */
+  /** Daño de área a todas las cajas dentro del radio (explosiones). */
   damageCrates(pos, radius, amount, game) {
     for (const c of this.crates) {
       if (!c.alive) continue;
@@ -209,6 +210,21 @@ export class Arena {
       if (dir.lengthSq() > 1e-6) dir.normalize();
       c.damage(amount * (1 - d / radius), game, dir);
     }
+  }
+
+  /**
+   * Barricada colocable por el jugador: es una Crate de 2×2 vóxeles y 1 capa,
+   * más baja y frágil que las coberturas del mapa. Hereda gratis el daño por
+   * balas, el daño de explosión (damageCrates) y el desregistro de su AABB al
+   * destruirse, porque es literalmente una Crate registrada en los mismos arrays.
+   */
+  spawnBarricade(cx, cz) {
+    const crate = new Crate(this.group, cx, cz, VOXEL * 2, VOXEL * 2, 1, 0x8a7a52);
+    crate.maxHp = crate.voxels.length * 34; // algo más dura por vóxel que las del mapa
+    crate.hp = crate.maxHp;
+    this.crates.push(crate);
+    this.walls.push(crate.box);
+    return crate;
   }
 
   randomSpawn(playerPos) {

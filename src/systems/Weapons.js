@@ -21,6 +21,8 @@ export const WEAPONS = {
   },
   barrel: { name: 'Barril', placeable: true, cooldown: 0.45, unlockAt: 2 },
   mine: { name: 'Mina', placeable: true, cooldown: 0.5, unlockAt: 4 },
+  barricade: { name: 'Barricada', placeable: true, cooldown: 0.6, unlockAt: 4 },
+  turret: { name: 'Torreta', placeable: true, cooldown: 0.8, unlockAt: 6 },
   grenade: {
     name: 'Granada', thrown: true, cooldown: 0.6, unlockAt: 5,
     // Parámetros del lanzamiento: velocidad horizontal, impulso vertical del arco,
@@ -38,7 +40,7 @@ export const WEAPONS = {
   },
 };
 
-export const WEAPON_ORDER = ['pistol', 'shotgun', 'uzi', 'barrel', 'mine', 'grenade', 'rocket'];
+export const WEAPON_ORDER = ['pistol', 'shotgun', 'uzi', 'barrel', 'mine', 'barricade', 'turret', 'grenade', 'rocket'];
 
 const BULLET_GEO = new THREE.BoxGeometry(0.12, 0.12, 0.75);
 const SHELL = { x: 0.1, y: 0.1, z: 0.22 };
@@ -122,6 +124,26 @@ export class WeaponSystem {
     this.muzzleTimer = 0.06;
     game.shake(w.shake);
     return true;
+  }
+
+  /**
+   * Inyecta una sola bala en el pool desde una fuente externa (p. ej. la torreta),
+   * sin cadencia, casquillo ni shake propios — esos los gestiona el llamador.
+   */
+  spawnBullet(game, origin, dir, { damage, speed, life, knock = 0, tracer = 0xffffff, splash = null }) {
+    const a = Math.atan2(dir.x, dir.z);
+    const b = this.#take();
+    b.mesh.material = this.#material(tracer);
+    b.mesh.position.copy(origin);
+    b.mesh.position.y = origin.y ?? 1.15;
+    b.mesh.rotation.set(0, a, 0);
+    b.mesh.visible = true;
+    b.dir.set(Math.sin(a), 0, Math.cos(a));
+    b.speed = speed;
+    b.damage = damage;
+    b.knock = knock;
+    b.life = life;
+    b.splash = splash;
   }
 
   update(dt, game) {

@@ -5,6 +5,7 @@ import { Arena } from './world/Arena.js';
 import { Player } from './entities/Player.js';
 import { Barrel } from './entities/Barrel.js';
 import { Mine } from './entities/Mine.js';
+import { Turret } from './entities/Turret.js';
 import { Pickup } from './entities/Pickup.js';
 import { WeaponSystem, WEAPONS, WEAPON_ORDER } from './systems/Weapons.js';
 import { WaveManager } from './systems/WaveManager.js';
@@ -104,6 +105,7 @@ const game = {
   zombies: [],
   barrels: [],
   mines: [],
+  turrets: [],
   corpses: [],
   pickups: [],
   score: 0,
@@ -113,7 +115,7 @@ const game = {
   multiplier: 1,
   weapon: 'pistol',
   unlocked: new Set(['pistol']),
-  ammo: { pistol: Infinity, shotgun: 12, uzi: 90, barrel: 2, mine: 2, grenade: 3, rocket: 1 },
+  ammo: { pistol: Infinity, shotgun: 12, uzi: 90, barrel: 2, mine: 2, barricade: 2, turret: 1, grenade: 3, rocket: 1 },
   essence: 20,
   maxEssence: 100,
   unlockedSpells: new Set(),
@@ -153,6 +155,8 @@ const game = {
     this.ammo.uzi += 3;
     if (this.combo % 6 === 0) this.ammo.barrel += 1;
     if (this.combo % 5 === 0) this.ammo.mine += 1;
+    if (this.combo % 8 === 0) this.ammo.barricade += 1;
+    if (this.combo % 15 === 0) this.ammo.turret += 1;
     if (this.combo % 7 === 0) this.ammo.grenade += 1;
     if (this.combo % 12 === 0) this.ammo.rocket += 1;
 
@@ -174,6 +178,8 @@ const game = {
     this.ammo.uzi += 40;
     this.ammo.barrel += 2;
     this.ammo.mine += 1;
+    this.ammo.barricade += 1;
+    if (n % 3 === 0) this.ammo.turret += 1;
     this.ammo.grenade += 2;
     this.ammo.rocket += 1;
     hud.showBanner(`Oleada ${n} despejada`, 2);
@@ -232,7 +238,7 @@ function maybeDrop(zombie) {
   else if (game.ammo.uzi < 25) kind = 'uzi';
   else if (game.ammo.shotgun < 6) kind = 'shotgun';
   else {
-    const pool = ['barrel', 'shotgun', 'uzi', 'mine', 'grenade', 'rocket'];
+    const pool = ['barrel', 'shotgun', 'uzi', 'mine', 'barricade', 'grenade', 'rocket'];
     kind = pool[Math.floor(Math.random() * pool.length)];
   }
 
@@ -362,6 +368,40 @@ function placeMine() {
   audio.place();
 }
 
+function placeBarricade() {
+  if (!game.unlocked.has('barricade') || game.ammo.barricade <= 0 || weapons.cooldown > 0) return;
+
+  forward.set(Math.sin(player.group.rotation.y), 0, Math.cos(player.group.rotation.y));
+  const pos = player.position.clone().addScaledVector(forward, 2.2);
+  pos.y = 0;
+
+  // No colocar encima de un muro/caja existente, de otra barricada, ni sobre el jugador.
+  for (const w of game.walls) if (circleHitsBox(pos.x, pos.z, 1.5, w)) return;
+  if (distXZ(pos, player.position) < 1.6) return;
+
+  game.arena.spawnBarricade(pos.x, pos.z);
+  game.ammo.barricade -= 1;
+  weapons.cooldown = WEAPONS.barricade.cooldown;
+  audio.place();
+  game.shake(0.06);
+}
+
+function placeTurret() {
+  if (!game.unlocked.has('turret') || game.ammo.turret <= 0 || weapons.cooldown > 0) return;
+
+  forward.set(Math.sin(player.group.rotation.y), 0, Math.cos(player.group.rotation.y));
+  const pos = player.position.clone().addScaledVector(forward, 1.8);
+  pos.y = 0;
+
+  for (const w of game.walls) if (circleHitsBox(pos.x, pos.z, 0.7, w)) return;
+  for (const t of game.turrets) if (distXZ(t.position, pos) < 1.4) return;
+
+  game.turrets.push(new Turret(scene, pos));
+  game.ammo.turret -= 1;
+  weapons.cooldown = WEAPONS.turret.cooldown;
+  audio.place();
+}
+
 function throwGrenade() {
   const w = WEAPONS.grenade;
   if (game.ammo.grenade <= 0 || weapons.cooldown > 0) return;
@@ -395,6 +435,8 @@ function handleShooting() {
   if (w.placeable) {
     if (input.fireTapped || input.tapped('Space')) {
       if (id === 'mine') placeMine();
+      else if (id === 'barricade') placeBarricade();
+      else if (id === 'turret') placeTurret();
       else placeBarrel();
     }
     return;
@@ -454,7 +496,7 @@ function sweep(list) {
 
 // ------------------------------------------------------------------ reset
 function resetGame() {
-  for (const list of [game.zombies, game.barrels, game.mines, game.corpses, game.pickups]) {
+  for (const list of [game.zombies, game.barrels, game.mines, game.turrets, game.corpses, game.pickups]) {
     for (const e of list) e.dispose(scene);
     list.length = 0;
   }
@@ -476,7 +518,7 @@ function resetGame() {
   game.bestMultiplier = 1;
   game.weapon = 'pistol';
   game.unlocked = new Set(['pistol']);
-  game.ammo = { pistol: Infinity, shotgun: 12, uzi: 90, barrel: 2, mine: 2, grenade: 3, rocket: 1 };
+  game.ammo = { pistol: Infinity, shotgun: 12, uzi: 90, barrel: 2, mine: 2, barricade: 2, turret: 1, grenade: 3, rocket: 1 };
   game.essence = 20;
   game.unlockedSpells = new Set();
   game.spellCooldowns = { stomp: 0, frostnova: 0 };
@@ -549,12 +591,14 @@ function tick() {
     separateZombies();
     for (const b of game.barrels) b.update(dt, game);
     for (const m of game.mines) m.update(dt, game);
+    for (const t of game.turrets) t.update(dt, game);
     for (const c of game.corpses) c.update(dt, game);
     for (const pk of game.pickups) pk.update(dt, game);
 
     sweep(game.zombies);
     sweep(game.barrels);
     sweep(game.mines);
+    sweep(game.turrets);
     sweep(game.corpses);
     sweep(game.pickups);
 

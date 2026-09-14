@@ -379,6 +379,18 @@ export class Zombie {
       game.arena.damageCrates(this.position, this.radius + 1.2, 9, game);
     }
 
+    // La horda también machaca las torretas que tenga pegadas.
+    if (this.attackCd <= 0 && game.turrets.length) {
+      for (const t of game.turrets) {
+        if (t.dead) continue;
+        if (distXZ(this.position, t.position) < this.radius + t.radius + 0.3) {
+          t.takeDamage(this.cfg.damage * 1.5, game);
+          this.attackCd = 0.85;
+          break;
+        }
+      }
+    }
+
     if (this.flash > 0) {
       this.flash -= dt;
       if (this.flash <= 0) this.#setFlash(false);
