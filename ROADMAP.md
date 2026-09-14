@@ -104,20 +104,66 @@ Por coste, de menor a mayor:
 
 ## Deuda técnica conocida (no roadmap de features, pero pendiente)
 
-- **Bug: el acorazado no se puede flanquear.** `Zombie.update()` fija
-  `this.group.rotation.y = Math.atan2(dx, dz)` cada frame sin límite de
-  velocidad de giro, así que la placa del acorazado siempre mira al
-  jugador. El bloqueo frontal en `takeDamage()` (`dot < -0.4`) nunca falla
-  a favor del jugador con balas normales — solo cae con explosivos o con
-  la Nova de Hielo (que bypassa el blindaje). Arreglo: limitar el giro a
-  unos 2-3 rad/s y, opcionalmente, dar vida propia a la placa para que
-  salte tras varios impactos frontales. Detectado hace varias pasadas,
-  todavía sin tocar.
-- **CSS del arsenal sin verificar visualmente con 7 armas.** `.hud-arsenal`
-  es una columna vertical; con 4 slots cabía de sobra, con 7 debería seguir
-  cabiendo pero no se ha comprobado en pantalla (no hay navegador/capturas
-  en el entorno de desarrollo, solo build + smoke test por curl).
-- **Bundle único de ~530 KB.** Vite avisa en cada build
-  ("Some chunks are larger than 500 kB"). No es un problema funcional,
-  pero si el proyecto sigue creciendo merece la pena mirar
-  `build.rollupOptions.output.manualChunks`.
+- **Bug: zombis atascados en esquinas, bloquean el fin de ronda.**
+  Reportado por Adrián: algunos zombis quedan "detrás de los muros" y las
+  balas no llegan. Diagnóstico (sin repro en vivo, por lectura de código):
+  el sistema anti-atasco de `Zombie.js` recalcula la dirección de
+  deslizamiento **cada frame contra la posición actual del jugador**, no
+  contra una dirección fija de "bordear este obstáculo". Funciona bien
+  contra un muro plano; contra un vértice de 90° (todas las cajas y
+  pilares del mapa son rectangulares, no hay nada redondo) puede quedar
+  oscilando indefinidamente si el jugador está relativamente parado —
+  cada frame el ángulo hacia el jugador cambia lo justo para que el
+  chequeo "¿sigo atascado?" parpadee entre sí/no sin llegar a rodear la
+  esquina de verdad. Desde la posición fija del jugador, ese zombi está
+  efectivamente al otro lado de un vértice sólido de forma persistente.
+  **Arreglo propuesto**: que el deslizamiento, una vez activado, mantenga
+  una dirección fija durante todo el intento de rodeo (wall-following de
+  verdad) en vez de recalcularla cada frame. Añadir además un **failsafe
+  duro**: atasco acumulado >6-8s → empujón directo hacia el jugador,
+  garantiza que ninguna ronda puede quedar bloqueada pase lo que pase con
+  el resto de la lógica.
+- **Bug: el acorazado no se puede flanquear.** (Sin cambios desde la
+  última vez — ver más arriba.)
+- **CSS del arsenal sin verificar visualmente con 7 armas.**
+- **Bundle único de ~530 KB.**
+
+---
+
+## Próxima tanda pedida (sin empezar, priorizada)
+
+1. **Fix del atasco en esquinas** — ver arriba, prioridad máxima.
+2. **Audio**: ajuste de los sonidos existentes (son parámetros de síntesis
+   en `Audio.js`, no archivos) + música de fondo — ambiente/tensión con
+   osciladores en bucle, stinger al limpiar ronda. Honesto: síntesis pura
+   da para ambiente/tensión, no para una banda sonora con melodía real —
+   eso exigiría pistas aportadas por el usuario.
+3. **Efectos visuales de Nova de Hielo y Pisar del Titán** — anillo de
+   onda expansiva con geometría propia (no solo partículas), grieta en el
+   suelo para el Titán (nuevo tipo de decal en `Decals.js`). Pulido sobre
+   sistemas existentes, sin arquitectura nueva.
+4. **Apagones periódicos** — cada X segundos de combate, aviso corto y
+   20-30s a oscuras forzando la linterna. Reutiliza el modo nocturno ya
+   existente (`setNight` en `main.js`); lo nuevo es el temporizador y el
+   aviso. Buena sinergia futura con el enemigo Volador (peligroso
+   precisamente por no verlo venir).
+5. **Barricadas** (arma que falta, la barata — ver §1 arriba).
+6. **Torreta** (arma que falta, IA de apuntado propia).
+7. **Rifle de plasma** (arma que falta, la cara — rayo continuo, pide
+   colisión segmento-contra-círculo que no existe).
+8. **Vórtice Gravitatorio y Círculo de Almas** (magias que faltan — ver §2
+   arriba, arquitectura nueva de verdad en ambos).
+9. **Menú principal** — estado nuevo antes de `playing`, autocontenido.
+10. **Más mapas** (Tight/Columns/Reactor primero, Rooftop es el caro — ver
+    §4 arriba).
+11. **Ruleta de selección de arma estilo GTA** (slowmo + blur + radial) —
+    la pieza de infraestructura más grande de toda esta tanda: el
+    proyecto no tiene absolutamente nada de postprocesado todavía, y el
+    blur de pantalla lo exige (`EffectComposer`). Cambiar de arma con
+    teclas numéricas ya funciona perfecto — esto es estética, no una
+    carencia funcional, candidato a ir el último de este bloque.
+12. **Enemigos nuevos** (Nigromante, Volador, Baba, Juggernaut) — sin
+    cambios respecto a §3 de este documento, el Volador sigue siendo el
+    ítem más caro de *toda* la lista combinada (primera vez con altura
+    real en Y).
+
