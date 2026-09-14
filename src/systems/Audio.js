@@ -96,6 +96,9 @@ export class AudioKit {
     } else if (weapon === 'uzi') {
       this.#burst({ gain: 0.32, dur: 0.07, type: 'highpass', from: 1600, to: 900 });
       this.#tone({ type: 'square', from: 320, to: 130, dur: 0.05, gain: 0.16 });
+    } else if (weapon === 'rocket') {
+      this.#burst({ gain: 0.55, dur: 0.35, type: 'lowpass', from: 2200, to: 300 });
+      this.#tone({ type: 'sawtooth', from: 140, to: 60, dur: 0.32, gain: 0.32 });
     } else {
       this.#burst({ gain: 0.5, dur: 0.11, type: 'highpass', from: 1100, to: 500 });
       this.#tone({ type: 'triangle', from: 260, to: 80, dur: 0.09, gain: 0.28 });

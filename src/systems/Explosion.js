@@ -50,6 +50,13 @@ export function explodeAt(game, pos, opts = {}) {
     if (tmpDir.lengthSq() > 1e-6) b.push(tmpDir.normalize(), 9 * (1 - d / (radius * 1.2)));
   }
 
+  if (chain && game.mines) {
+    for (const m of game.mines) {
+      if (m.dead) continue;
+      if (distXZ(m.position, pos) <= radius * 1.1) m.explode(game);
+    }
+  }
+
   game.arena.damageCrates(pos, radius, damage * 0.55, game);
 
   const dp = distXZ(game.player.position, pos);

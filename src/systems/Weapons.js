@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { pointInBox, distXZ, rand } from '../core/Collision.js';
+import { explodeAt } from './Explosion.js';
 
 export const WEAPONS = {
   pistol: {
@@ -19,9 +20,25 @@ export const WEAPONS = {
     tracer: 0xbfe7ff, unlockAt: 6,
   },
   barrel: { name: 'Barril', placeable: true, cooldown: 0.45, unlockAt: 2 },
+  mine: { name: 'Mina', placeable: true, cooldown: 0.5, unlockAt: 4 },
+  grenade: {
+    name: 'Granada', thrown: true, cooldown: 0.6, unlockAt: 5,
+    // Parámetros del lanzamiento: velocidad horizontal, impulso vertical del arco,
+    // mecha, y la explosión que dispara al detonar (reutiliza explodeAt).
+    throwSpeed: 13, arcSpeed: 8, fuse: 1.2,
+    blast: { radius: 5.5, damage: 130, playerDamage: 38, color: 0x8fae4a },
+  },
+  rocket: {
+    // Vive en el mismo pool de proyectiles que pistola/uzi, pero con `splash`:
+    // en vez de dañar a un único objetivo, detona con explodeAt en el punto de impacto.
+    name: 'Cohete', auto: false, cooldown: 1.15, pellets: 1,
+    spread: 0.008, speed: 34, life: 2.2, shake: 0.4, knock: 0,
+    tracer: 0xff6a3b, unlockAt: 8,
+    splash: { radius: 6, damage: 190, playerDamage: 50, color: 0xff8c4a },
+  },
 };
 
-export const WEAPON_ORDER = ['pistol', 'shotgun', 'uzi', 'barrel'];
+export const WEAPON_ORDER = ['pistol', 'shotgun', 'uzi', 'barrel', 'mine', 'grenade', 'rocket'];
 
 const BULLET_GEO = new THREE.BoxGeometry(0.12, 0.12, 0.75);
 const SHELL = { x: 0.1, y: 0.1, z: 0.22 };
@@ -39,7 +56,7 @@ export class WeaponSystem {
       const mesh = new THREE.Mesh(BULLET_GEO, this.#material(0xffffff));
       mesh.visible = false;
       scene.add(mesh);
-      this.bullets.push({ mesh, dir: new THREE.Vector3(), speed: 0, damage: 0, knock: 0, life: 0 });
+      this.bullets.push({ mesh, dir: new THREE.Vector3(), speed: 0, damage: 0, knock: 0, life: 0, splash: null });
     }
 
     // La luz vive siempre en la escena con intensidad 0: ocultarla cambiaría el
@@ -84,6 +101,7 @@ export class WeaponSystem {
       b.damage = w.damage;
       b.knock = w.knock;
       b.life = w.life;
+      b.splash = w.splash ?? null;
     }
 
     // Casquillo persistente: sale por el lateral derecho del arma.
@@ -134,10 +152,14 @@ export class WeaponSystem {
 
         for (const w of game.walls) {
           if (!pointInBox(p.x, p.z, w)) continue;
-          game.particles.burst(p, 0x9aa0ab, 4, { power: 4, size: 0.12, ttl: 0.45 });
-          game.flashLight(p, 0xffd9a0, 4, 0.06);
-          if (w.crate) w.crate.damage(b.damage, game, b.dir);
-          else game.decals.scorch(p, 0.35);
+          if (b.splash) {
+            explodeAt(game, p, b.splash);
+          } else {
+            game.particles.burst(p, 0x9aa0ab, 4, { power: 4, size: 0.12, ttl: 0.45 });
+            game.flashLight(p, 0xffd9a0, 4, 0.06);
+            if (w.crate) w.crate.damage(b.damage, game, b.dir);
+            else game.decals.scorch(p, 0.35);
+          }
           consumed = true;
           break;
         }
@@ -148,6 +170,14 @@ export class WeaponSystem {
           const z = nearby[n];
           if (z.dead) continue;
           if (distXZ(p, z.position) >= z.radius + 0.2) continue;
+
+          if (b.splash) {
+            // El cohete no rebota en la placa del acorazado: la explosión ignora
+            // el blindaje igual que cualquier otra (ver opts.explosive en Zombie).
+            explodeAt(game, p, b.splash);
+            consumed = true;
+            break;
+          }
 
           const result = z.takeDamage(b.damage, game, b.dir, { knock: b.knock });
           if (result === 'block') {
@@ -173,8 +203,11 @@ export class WeaponSystem {
         for (const bar of game.barrels) {
           if (bar.dead) continue;
           if (distXZ(p, bar.position) < bar.radius + 0.2) {
-            bar.push(b.dir, 3.5);
-            bar.takeDamage(b.damage, game);
+            if (b.splash) explodeAt(game, p, b.splash);
+            else {
+              bar.push(b.dir, 3.5);
+              bar.takeDamage(b.damage, game);
+            }
             consumed = true;
             break;
           }
@@ -184,6 +217,11 @@ export class WeaponSystem {
       if (consumed) {
         b.life = 0;
         b.mesh.visible = false;
+      } else if (b.splash && Math.random() < 0.7) {
+        // Estela de humo del cohete en vuelo.
+        game.particles.burst(b.mesh.position, 0x8a8a86, 1, {
+          power: 0.6, size: 0.16, ttl: 0.5, up: 0.15, spread: 0.08,
+        });
       }
     }
   }

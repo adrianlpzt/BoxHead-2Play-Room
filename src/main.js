@@ -4,6 +4,7 @@ import './style.css';
 import { Arena } from './world/Arena.js';
 import { Player } from './entities/Player.js';
 import { Barrel } from './entities/Barrel.js';
+import { Mine } from './entities/Mine.js';
 import { Pickup } from './entities/Pickup.js';
 import { WeaponSystem, WEAPONS, WEAPON_ORDER } from './systems/Weapons.js';
 import { WaveManager } from './systems/WaveManager.js';
@@ -11,6 +12,7 @@ import { Particles } from './systems/Particles.js';
 import { Debris } from './systems/Debris.js';
 import { Decals } from './systems/Decals.js';
 import { Fireballs } from './systems/Fireballs.js';
+import { Grenades } from './systems/Grenades.js';
 import { AudioKit } from './systems/Audio.js';
 import { Input } from './core/Input.js';
 import { HUD } from './core/HUD.js';
@@ -76,6 +78,7 @@ const debris = new Debris(scene, 420);
 const shells = new Debris(scene, 150);
 const weapons = new WeaponSystem(scene, 240);
 const fireballs = new Fireballs(scene, 32);
+const grenades = new Grenades(scene, 16);
 const player = new Player(scene);
 const input = new Input(canvas);
 const hud = new HUD();
@@ -92,11 +95,12 @@ window.addEventListener('keydown', unlockAudio);
 let hitstop = 0;
 
 const game = {
-  scene, arena, decals, particles, debris, shells, weapons, fireballs,
+  scene, arena, decals, particles, debris, shells, weapons, fireballs, grenades,
   player, audio, grid,
   walls: arena.walls,
   zombies: [],
   barrels: [],
+  mines: [],
   corpses: [],
   pickups: [],
   score: 0,
@@ -106,7 +110,7 @@ const game = {
   multiplier: 1,
   weapon: 'pistol',
   unlocked: new Set(['pistol']),
-  ammo: { pistol: Infinity, shotgun: 12, uzi: 90, barrel: 2 },
+  ammo: { pistol: Infinity, shotgun: 12, uzi: 90, barrel: 2, mine: 2, grenade: 3, rocket: 1 },
   bestMultiplier: 1,
   state: 'playing',
   trauma: 0,
@@ -141,6 +145,9 @@ const game = {
     if (this.combo % 2 === 0) this.ammo.shotgun += 1;
     this.ammo.uzi += 3;
     if (this.combo % 6 === 0) this.ammo.barrel += 1;
+    if (this.combo % 5 === 0) this.ammo.mine += 1;
+    if (this.combo % 7 === 0) this.ammo.grenade += 1;
+    if (this.combo % 12 === 0) this.ammo.rocket += 1;
 
     if (this.multiplier > this.bestMultiplier) this.bestMultiplier = this.multiplier;
     unlockByMultiplier(this.multiplier);
@@ -157,6 +164,9 @@ const game = {
     this.ammo.shotgun += 6;
     this.ammo.uzi += 40;
     this.ammo.barrel += 2;
+    this.ammo.mine += 1;
+    this.ammo.grenade += 2;
+    this.ammo.rocket += 1;
     hud.showBanner(`Oleada ${n} despejada`, 2);
   },
 
@@ -194,7 +204,10 @@ function maybeDrop(zombie) {
   if (game.player.hp < 45 && Math.random() < 0.3) kind = 'health';
   else if (game.ammo.uzi < 25) kind = 'uzi';
   else if (game.ammo.shotgun < 6) kind = 'shotgun';
-  else kind = Math.random() < 0.25 ? 'barrel' : Math.random() < 0.5 ? 'shotgun' : 'uzi';
+  else {
+    const pool = ['barrel', 'shotgun', 'uzi', 'mine', 'grenade', 'rocket'];
+    kind = pool[Math.floor(Math.random() * pool.length)];
+  }
 
   game.pickups.push(new Pickup(scene, zombie.position, kind));
 }
@@ -250,11 +263,53 @@ function placeBarrel() {
   audio.place();
 }
 
+function placeMine() {
+  if (!game.unlocked.has('mine') || game.ammo.mine <= 0 || weapons.cooldown > 0) return;
+
+  forward.set(Math.sin(player.group.rotation.y), 0, Math.cos(player.group.rotation.y));
+  const pos = player.position.clone().addScaledVector(forward, 1.4);
+  pos.y = 0;
+
+  for (const w of game.walls) if (circleHitsBox(pos.x, pos.z, 0.5, w)) return;
+  for (const m of game.mines) if (distXZ(m.position, pos) < 1) return;
+
+  game.mines.push(new Mine(scene, pos));
+  game.ammo.mine -= 1;
+  weapons.cooldown = WEAPONS.mine.cooldown;
+  audio.place();
+}
+
+function throwGrenade() {
+  const w = WEAPONS.grenade;
+  if (game.ammo.grenade <= 0 || weapons.cooldown > 0) return;
+
+  aimDir.set(aimPoint.x - player.position.x, 0, aimPoint.z - player.position.z);
+  if (aimDir.lengthSq() < 0.001) return;
+  aimDir.normalize();
+
+  player.muzzle(muzzlePos);
+  grenades.spawn(muzzlePos, aimDir, w);
+  game.ammo.grenade -= 1;
+  weapons.cooldown = w.cooldown;
+  audio.place();
+  game.shake(0.1);
+  if (game.ammo.grenade <= 0) selectWeapon('pistol');
+}
+
 function handleShooting() {
   const id = game.weapon;
   const w = WEAPONS[id];
+
   if (w.placeable) {
-    if (input.fireTapped || input.tapped('Space')) placeBarrel();
+    if (input.fireTapped || input.tapped('Space')) {
+      if (id === 'mine') placeMine();
+      else placeBarrel();
+    }
+    return;
+  }
+
+  if (w.thrown) {
+    if (input.fireTapped || input.tapped('Space')) throwGrenade();
     return;
   }
 
@@ -307,13 +362,14 @@ function sweep(list) {
 
 // ------------------------------------------------------------------ reset
 function resetGame() {
-  for (const list of [game.zombies, game.barrels, game.corpses, game.pickups]) {
+  for (const list of [game.zombies, game.barrels, game.mines, game.corpses, game.pickups]) {
     for (const e of list) e.dispose(scene);
     list.length = 0;
   }
 
   weapons.clear();
   fireballs.clear();
+  grenades.clear();
   particles.clear();
   debris.clear();
   shells.clear();
@@ -327,7 +383,7 @@ function resetGame() {
   game.bestMultiplier = 1;
   game.weapon = 'pistol';
   game.unlocked = new Set(['pistol']);
-  game.ammo = { pistol: Infinity, shotgun: 12, uzi: 90, barrel: 2 };
+  game.ammo = { pistol: Infinity, shotgun: 12, uzi: 90, barrel: 2, mine: 2, grenade: 3, rocket: 1 };
   game.trauma = 0;
   game.state = 'playing';
   hitstop = 0;
@@ -377,15 +433,18 @@ function tick() {
     grid.build(game.zombies);
     weapons.update(dt, game);
     fireballs.update(dt, game);
+    grenades.update(dt, game);
 
     for (const z of game.zombies) z.update(dt, game);
     separateZombies();
     for (const b of game.barrels) b.update(dt, game);
+    for (const m of game.mines) m.update(dt, game);
     for (const c of game.corpses) c.update(dt, game);
     for (const pk of game.pickups) pk.update(dt, game);
 
     sweep(game.zombies);
     sweep(game.barrels);
+    sweep(game.mines);
     sweep(game.corpses);
     sweep(game.pickups);
 
