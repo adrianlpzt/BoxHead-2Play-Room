@@ -306,3 +306,83 @@ compromiso tibio para ambos.
 - [x] **Vida y esencia como barras flotantes 3D** sobre el jugador
   (`entities/FloatingBars.js`), billboard hacia la cámara, fuera del overlay.
   La vida vira ámbar→rojo al bajar.
+
+---
+
+## PLAN — Online (Fase A) + rebalanceo de oleadas
+
+Acordado con Adrián: el próximo bloque de trabajo (a implementar, probablemente
+con Opus) cubre estas dos piezas. Documentado aquí con detalle suficiente para
+empezar sin tener que releer toda la conversación.
+
+### 1. Rebalanceo de densidad de oleadas (prioridad alta, barato)
+
+**Diagnóstico con números reales** (no intuición): en la oleada 20 el
+presupuesto es 96 zombis, soltados a 8,3/s → todo el lote sale en 11,5s. Pero
+la distancia media esquina→centro (34 unidades) tarda ~10-12s en cruzarse
+caminando a la velocidad de un zombi normal. El lote entero llega casi de
+golpe, se limpia rápido (los desbloqueos por multiplicador son permanentes
+aunque el combo decaiga después, así que el arsenal en oleada 20 ya es fuerte),
+y luego hay un hueco muerto hasta el siguiente lote. Es un ciclo de
+atracón-y-ayuno, no un flujo sostenido — rompe los combos largos, que a
+multiplicador alto necesitan una baja cada 1-1,5s. Además, `spawnInterval`
+toca su suelo (0,12s) desde ~oleada 16: a partir de ahí el único mando que
+queda es el presupuesto total, no la cadencia.
+
+**Cambios propuestos** (`systems/WaveManager.js`, `world/Arena.js`):
+1. **Puntos de spawn dinámicos más cercanos al jugador**, no solo las 4
+   esquinas fijas. P. ej. un anillo de puntos calculado a partir de la
+   posición actual del jugador (radio medio, no encima suyo ni al otro lado
+   del mapa) — es la palanca de mayor impacto: reduce el tiempo de viaje de
+   ~10-12s a unos pocos segundos.
+2. **Más puntos de spawn** (8 en vez de 4) para evitar que el lote llegue
+   agrupado desde un único vector.
+3. **Trickle continuo en vez de front-loaded**: en lugar de soltar todo el
+   presupuesto al principio de la oleada a intervalo fijo, mantener una
+   población mínima objetivo cerca del jugador — soltar más cuando la
+   densidad cercana cae por debajo de un umbral, no solo por temporizador.
+4. **`MAX_ALIVE` y crecimiter del presupuesto para oleadas muy altas**: 150
+   ya no es el cuello de botella a la 20 (presupuesto 96 < tope), pero para
+   "más dificultad" real en tiradas largas, subir el crecimiento del
+   presupuesto y/o el propio tope en oleadas avanzadas.
+
+### 2. Multijugador online — Fase A (señalización + sala)
+
+Modelo acordado: **host-P2P estilo COD antiguo**, no servidor autoritativo
+(reescribiría toda la simulación). El host juega su partida normal; el
+invitado dejará de simular zombis y solo pintará lo que el host le manda.
+Ancho de banda comprobado: snapshot compacto ~9 bytes/zombi × 150 a 15Hz ≈
+20KB/s — no es el problema.
+
+**Fase A — objetivo de esta pasada: que dos navegadores se digan "hola" por
+un código de sala. Cero lógica de juego todavía.**
+
+- **Servicio de señalización nuevo en Railway** (proyecto ya existe,
+  `03af9a16-d97a-43d8-bfd6-e4f8109c733e` — crear un segundo servicio, no
+  tocar el del juego). Node mínimo con `ws`: `create-room` devuelve un
+  código corto, `join-room(code)` conecta al segundo socket a la sala y
+  reenvía SDP offer/answer + candidatos ICE entre ambos. En cuanto el
+  WebRTC DataChannel queda establecido, la señalización ya no hace falta —
+  los datos van directos entre los dos PCs.
+- **Cliente**: `src/core/Net.js` — envuelve `RTCPeerConnection` +
+  `RTCDataChannel`, usa STUN público (`stun:stun.l.google.com:19302`),
+  intercambia SDP/ICE vía el WebSocket de señalización, expone una interfaz
+  por eventos (`onConnected`, `onData`, `send`).
+- **Sin TURN en esta primera versión** — decisión consciente. Algunos NAT
+  estrictos no podrán conectar directo; se acepta con un mensaje claro de
+  error en vez de gastar en infraestructura de relé antes de validar que el
+  resto funciona.
+- **`core/Menu.js`**: la pantalla "Multijugador" (hoy placeholder) pasa a
+  tener Crear sala (genera código, espera) / Unirse a sala (introducir
+  código).
+- **Entregable de la Fase A**: dos pestañas/dispositivos intercambian un
+  mensaje de prueba por el DataChannel usando un código de sala. Nada de
+  zombis, nada de sincronización de mundo todavía.
+
+**Fases siguientes (no en esta pasada, solo para contexto):**
+- Fase B: el host manda snapshots del mundo; el invitado solo pinta (modo
+  espectador).
+- Fase C: el invitado manda sus inputs; el host genera un segundo jugador
+  real que los obedece.
+- Fase D: pulido — predicción local en el invitado si el input-a-host-y-
+  vuelta se nota, solo después de que la tubería funcione de punta a punta.
