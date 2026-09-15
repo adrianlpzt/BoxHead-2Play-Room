@@ -29,6 +29,7 @@ export class Grenades {
         fuse: 0,
         life: 0,
         blast: null,
+        cluster: 0,
       });
     }
   }
@@ -39,20 +40,39 @@ export class Grenades {
     return g;
   }
 
-  spawn(origin, dir, weapon) {
+  spawn(origin, dir, weapon, opts = {}) {
     const g = this.#take();
     g.mesh.position.copy(origin);
     g.mesh.visible = true;
     g.vel.set(dir.x * weapon.throwSpeed, weapon.arcSpeed, dir.z * weapon.throwSpeed);
     g.spin.set(Math.random() * 14 - 7, Math.random() * 14 - 7, Math.random() * 14 - 7);
-    g.fuse = weapon.fuse;
-    g.life = weapon.fuse + 2; // red de seguridad: nunca vive más que esto
-    g.blast = weapon.blast;
+    g.fuse = opts.fuse ?? weapon.fuse;
+    g.life = g.fuse + 2; // red de seguridad: nunca vive más que esto
+    g.blast = opts.blast ?? weapon.blast;
+    // cluster: nº de submuniciones al detonar (0 = no fragmenta). Las hijas
+    // nacen con isChild para que no vuelvan a fragmentar (evita cadena infinita).
+    g.cluster = opts.isChild ? 0 : (weapon.cluster ?? 0);
     return g;
   }
 
   #explode(g, game) {
     explodeAt(game, g.mesh.position, g.blast);
+    // Granadas de racimo: esparce submuniciones con mecha corta alrededor.
+    if (g.cluster > 0) {
+      const childBlast = {
+        radius: (g.blast.radius ?? 5.5) * 0.55,
+        damage: (g.blast.damage ?? 130) * 0.5,
+        playerDamage: (g.blast.playerDamage ?? 38) * 0.4,
+        color: g.blast.color ?? 0x8fae4a,
+      };
+      for (let i = 0; i < g.cluster; i++) {
+        const a = (i / g.cluster) * Math.PI * 2 + Math.random();
+        const dir = { x: Math.cos(a), z: Math.sin(a) };
+        this.spawn(g.mesh.position, dir, { throwSpeed: 6, arcSpeed: 5 }, {
+          isChild: true, fuse: 0.4 + Math.random() * 0.35, blast: childBlast,
+        });
+      }
+    }
     g.life = 0;
     g.mesh.visible = false;
   }

@@ -3,11 +3,11 @@ import { distXZ, rand } from '../core/Collision.js';
 
 export const SPELLS = {
   stomp: {
-    name: 'Pisar del Titán', key: 'Q', cost: 20, cooldown: 0.9, unlockAt: 3,
+    name: 'Pisar del Titán', key: 'Q', cost: 20, cooldown: 0.9, unlockAt: 12,
     radius: 5.5, halfAngleDeg: 55, damage: 45, knock: 14,
   },
   frostnova: {
-    name: 'Nova de Hielo', key: 'E', cost: 35, cooldown: 1.4, unlockAt: 7,
+    name: 'Nova de Hielo', key: 'E', cost: 35, cooldown: 1.4, unlockAt: 35,
     radius: 6, duration: 3,
   },
 };

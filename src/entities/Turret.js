@@ -18,16 +18,20 @@ const vAim = new THREE.Vector3();
  * WeaponSystem vía game.weapons.spawnBullet (no crea proyectiles propios).
  */
 export class Turret {
-  constructor(scene, position) {
+  constructor(scene, position, heavy = false) {
     this.radius = RADIUS;
-    this.hp = HP;
-    this.ammo = AMMO;
+    this.heavy = heavy;
+    // Torreta Pesada: más vida, más munición, dispara más rápido y pega más.
+    this.hp = heavy ? HP * 2 : HP;
+    this.ammo = heavy ? AMMO * 2 : AMMO;
+    this.fireCdBase = heavy ? FIRE_CD * 0.6 : FIRE_CD;
+    this.bulletDmg = heavy ? BULLET_DMG * 1.4 : BULLET_DMG;
     this.dead = false;
     this.fireCd = 0.5; // breve gracia al desplegarse
     this.aimAngle = 0;
 
-    this.matBase = new THREE.MeshLambertMaterial({ color: 0x394251 });
-    this.matHead = new THREE.MeshLambertMaterial({ color: 0x5a6678 });
+    this.matBase = new THREE.MeshLambertMaterial({ color: heavy ? 0x4a3f2a : 0x394251 });
+    this.matHead = new THREE.MeshLambertMaterial({ color: heavy ? 0x8a6d2f : 0x5a6678 });
     this.matBarrel = new THREE.MeshLambertMaterial({ color: 0x23262c });
 
     this.group = new THREE.Group();
@@ -115,11 +119,11 @@ export class Turret {
           this.position.x + vAim.x * 0.7, 1.0, this.position.z + vAim.z * 0.7
         );
         game.weapons.spawnBullet(game, muzzle, vAim, {
-          damage: BULLET_DMG, speed: 55, life: RANGE / 55 + 0.1, knock: 1.5, tracer: 0x9fd8ff,
+          damage: this.bulletDmg, speed: 55, life: RANGE / 55 + 0.1, knock: 1.5, tracer: 0x9fd8ff,
         });
         game.flashLight(muzzle, 0xbfe7ff, 8, 0.05);
         game.audio.shot('uzi');
-        this.fireCd = FIRE_CD;
+        this.fireCd = this.fireCdBase;
         this.ammo -= 1;
         if (this.ammo <= 0) {
           // Sin munición: se apaga (queda como obstáculo hasta que la derriben).

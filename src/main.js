@@ -8,7 +8,8 @@ import { Barrel } from './entities/Barrel.js';
 import { Mine } from './entities/Mine.js';
 import { Turret } from './entities/Turret.js';
 import { Pickup } from './entities/Pickup.js';
-import { WeaponSystem, WEAPONS, WEAPON_ORDER } from './systems/Weapons.js';
+import { FloatingBars } from './entities/FloatingBars.js';
+import { WeaponSystem, WEAPONS, WEAPON_ORDER, effWeapon } from './systems/Weapons.js';
 import { WaveManager } from './systems/WaveManager.js';
 import { Particles } from './systems/Particles.js';
 import { Debris } from './systems/Debris.js';
@@ -91,6 +92,7 @@ const fireballs = new Fireballs(scene, 32);
 const grenades = new Grenades(scene, 16);
 const shockwaves = new Shockwaves(scene, 14);
 const player = new Player(scene);
+const floatingBars = new FloatingBars(scene);
 const input = new Input(canvas);
 const touch = new TouchControls(input);
 const isTouch = TouchControls.isTouch();
@@ -141,11 +143,12 @@ const game = {
   pickups: [],
   score: 0,
   combo: 0,
-  comboWindow: 3.2,
-  comboTimer: 0,
   multiplier: 1,
+  decay: 0,        // barra de mantenimiento del multiplicador, 0..1
+  maxMultiplier: 99,
   weapon: 'pistol',
   unlocked: new Set(['pistol']),
+  upgraded: new Set(),
   ammo: { pistol: Infinity, shotgun: 12, uzi: 90, barrel: 2, mine: 2, barricade: 2, turret: 1, grenade: 3, rocket: 1 },
   essence: 20,
   maxEssence: 100,
@@ -178,10 +181,13 @@ const game = {
 
   registerKill(zombie) {
     this.combo += 1;
-    this.comboTimer = this.comboWindow;
-    this.multiplier = Math.min(10, this.combo);
+    // Cada baja sube el multiplicador y rellena la barra de mantenimiento.
+    this.multiplier = Math.min(this.maxMultiplier, this.multiplier + 1);
+    this.decay = 1;
     this.score += zombie.cfg.points * this.multiplier;
 
+    // Munición como recompensa de racha (ligada al combo, no al multiplicador,
+    // para que siga fluyendo aunque el multiplicador se estabilice).
     if (this.combo % 2 === 0) this.ammo.shotgun += 1;
     this.ammo.uzi += 3;
     if (this.combo % 6 === 0) this.ammo.barrel += 1;
@@ -194,8 +200,15 @@ const game = {
     if (this.multiplier > this.bestMultiplier) this.bestMultiplier = this.multiplier;
     unlockByMultiplier(this.multiplier);
     unlockSpellByMultiplier(this.multiplier);
-    this.essence = Math.min(this.maxEssence, this.essence + 2 + this.multiplier * 0.6);
+    this.essence = Math.min(this.maxEssence, this.essence + 2 + this.multiplier * 0.4);
     maybeDrop(zombie);
+  },
+
+  /** Velocidad de drenaje de la barra de multiplicador: crece con la altura.
+   *  A x1 la barra dura ~4s; a x50 apenas ~1s. Mantener un multiplicador alto
+   *  exige matar sin parar, justo como el Boxhead original. */
+  decayRate() {
+    return 0.25 + this.multiplier * 0.015;
   },
 
   onWaveStart(n) {
@@ -237,6 +250,12 @@ function unlockByMultiplier(mult) {
     if (!game.unlocked.has(id) && mult >= w.unlockAt) {
       game.unlocked.add(id);
       hud.showBanner(`${w.name} desbloqueada`, 1.6);
+      audio.unlockWeapon();
+    }
+    // Upgrade de arma al alcanzar su milestone (escopeta→auto-shotty, uzi→minigun).
+    if (w.upgrade && game.unlocked.has(id) && !game.upgraded.has(id) && mult >= w.upgradeAt) {
+      game.upgraded.add(id);
+      hud.showBanner(`¡${w.upgrade.name}! Arma mejorada`, 2);
       audio.unlockWeapon();
     }
   }
@@ -431,14 +450,14 @@ function placeTurret() {
   for (const w of game.walls) if (circleHitsBox(pos.x, pos.z, 0.7, w)) return;
   for (const t of game.turrets) if (distXZ(t.position, pos) < 1.4) return;
 
-  game.turrets.push(new Turret(scene, pos));
+  game.turrets.push(new Turret(scene, pos, game.upgraded.has('turret')));
   game.ammo.turret -= 1;
   weapons.cooldown = WEAPONS.turret.cooldown;
   audio.place();
 }
 
 function throwGrenade() {
-  const w = WEAPONS.grenade;
+  const w = effWeapon(game, 'grenade');
   if (game.ammo.grenade <= 0 || weapons.cooldown > 0) return;
 
   aimDir.set(aimPoint.x - player.position.x, 0, aimPoint.z - player.position.z);
@@ -465,7 +484,7 @@ function castSpell(id) {
 
 function handleShooting() {
   const id = game.weapon;
-  const w = WEAPONS[id];
+  const w = effWeapon(game, id);
 
   if (w.placeable) {
     if (input.fireTapped || input.tapped('Space')) {
@@ -551,11 +570,12 @@ function resetGame() {
 
   game.score = 0;
   game.combo = 0;
-  game.comboTimer = 0;
+  game.decay = 0;
   game.multiplier = 1;
   game.bestMultiplier = 1;
   game.weapon = 'pistol';
   game.unlocked = new Set(['pistol']);
+  game.upgraded = new Set();
   game.ammo = { pistol: Infinity, shotgun: 12, uzi: 90, barrel: 2, mine: 2, barricade: 2, turret: 1, grenade: 3, rocket: 1 };
   game.essence = 20;
   game.unlockedSpells = new Set();
@@ -678,13 +698,20 @@ function tick() {
     sweep(game.corpses);
     sweep(game.pickups);
 
-    if (game.comboTimer > 0) {
-      game.comboTimer -= dt;
-      if (game.comboTimer <= 0) {
-        game.comboTimer = 0;
-        game.combo = 0;
-        game.multiplier = 1;
+    // Drenaje del multiplicador. La barra baja a una velocidad que crece con la
+    // altura; al vaciarse, el multiplicador cae un escalón y la barra se rellena
+    // parcialmente — así perder x40 no te manda de golpe a x1, pero mantenerlo
+    // alto exige matar constantemente.
+    if (game.multiplier > 1) {
+      game.decay -= game.decayRate() * dt;
+      if (game.decay <= 0) {
+        game.multiplier = Math.max(1, game.multiplier - 1);
+        game.decay = game.multiplier > 1 ? 0.55 : 0;
+        if (game.multiplier === 1) game.combo = 0;
       }
+    } else {
+      game.decay = 0;
+      game.combo = 0;
     }
 
     for (const id of SPELL_ORDER) {
@@ -718,6 +745,9 @@ function tick() {
   sun.position.set(player.position.x + 24, 46, player.position.z + 18);
   sun.target.position.copy(player.position);
   sun.target.updateMatrixWorld();
+
+  floatingBars.setVisible(game.state === 'playing');
+  if (game.state === 'playing') floatingBars.update(player, game, camera);
 
   hud.update(game, raw);
   renderer.render(scene, camera);

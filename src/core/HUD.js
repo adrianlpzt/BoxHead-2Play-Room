@@ -4,8 +4,6 @@ import { DASH_COOLDOWN_TIME } from '../entities/Player.js';
 
 export class HUD {
   constructor() {
-    this.healthFill = document.getElementById('health-fill');
-    this.healthText = document.getElementById('health-text');
     this.comboMult = document.getElementById('combo-mult');
     this.comboFill = document.getElementById('combo-fill');
     this.kills = document.getElementById('kills');
@@ -37,10 +35,9 @@ export class HUD {
       el.className = 'slot locked';
       el.innerHTML = `<span class="num">${i + 1}</span><span class="name">${w.name}</span><span class="ammo">—</span>`;
       host.appendChild(el);
-      this.slots[id] = { root: el, ammo: el.querySelector('.ammo') };
+      this.slots[id] = { root: el, ammo: el.querySelector('.ammo'), nameEl: el.querySelector('.name') };
     });
 
-    this.essenceFill = document.getElementById('essence-fill');
     const spellHost = document.getElementById('spells');
     this.spellSlots = {};
     SPELL_ORDER.forEach((id) => {
@@ -60,14 +57,9 @@ export class HUD {
   }
 
   update(game, dt) {
-    const p = game.player;
-    const hp = Math.max(0, p.hp);
-    this.healthFill.style.transform = `scaleX(${hp / p.maxHp})`;
-    this.healthText.textContent = Math.ceil(hp);
-
     this.comboMult.textContent = `x${game.multiplier}`;
-    this.comboMult.classList.toggle('cold', game.combo === 0);
-    this.comboFill.style.transform = `scaleX(${game.comboTimer / game.comboWindow})`;
+    this.comboMult.classList.toggle('cold', game.multiplier <= 1);
+    this.comboFill.style.transform = `scaleX(${Math.max(0, Math.min(1, game.decay))})`;
     this.kills.textContent = game.combo;
 
     const dashK = game.player.dashCd > 0 ? 1 - game.player.dashCd / DASH_COOLDOWN_TIME : 1;
@@ -84,13 +76,19 @@ export class HUD {
       const s = this.slots[id];
       const unlocked = game.unlocked.has(id);
       const ammo = game.ammo[id];
+      const upgraded = game.upgraded && game.upgraded.has(id);
       s.root.classList.toggle('locked', !unlocked);
       s.root.classList.toggle('active', unlocked && game.weapon === id);
       s.root.classList.toggle('empty', unlocked && ammo === 0);
+      s.root.classList.toggle('upgraded', upgraded);
+      // Nombre mejorado si aplica.
+      if (s.nameEl) {
+        const base = WEAPONS[id];
+        s.nameEl.textContent = upgraded && base.upgrade ? base.upgrade.name : base.name;
+      }
       s.ammo.textContent = !unlocked ? '—' : ammo === Infinity ? '∞' : ammo;
     }
 
-    this.essenceFill.style.transform = `scaleX(${game.essence / game.maxEssence})`;
     for (const id of SPELL_ORDER) {
       const cfg = SPELLS[id];
       const el = this.spellSlots[id];

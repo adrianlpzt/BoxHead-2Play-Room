@@ -17,6 +17,7 @@ export class Player {
     this.hp = this.maxHp;
     this.dead = false;
     this.hurtCooldown = 0;
+    this.timeSinceHurt = 0; // segundos sin recibir daño (para la regeneración)
     this.flash = 0;
     this.walkPhase = 0;
     this.vel = new THREE.Vector3();
@@ -128,6 +129,7 @@ export class Player {
     this.hp = this.maxHp;
     this.dead = false;
     this.hurtCooldown = 0;
+    this.timeSinceHurt = 0;
     this.flash = 0;
     this.dashTime = 0;
     this.dashCd = 0;
@@ -142,6 +144,7 @@ export class Player {
     if (this.dead || this.hurtCooldown > 0 || this.invuln > 0) return;
     this.hp -= amount;
     this.hurtCooldown = 0.35;
+    this.timeSinceHurt = 0; // reinicia la cuenta para volver a regenerar
     this.flash = 0.28;
     game.shake(0.18);
     game.audio.hurt();
@@ -225,6 +228,14 @@ export class Player {
     if (this.dashCd > 0) this.dashCd -= dt;
     if (this.invuln > 0) this.invuln -= dt;
     if (this.hurtCooldown > 0) this.hurtCooldown -= dt;
+
+    // Regeneración de vida: tras 5 s sin recibir daño, recupera 5 de vida/s.
+    if (!this.dead) {
+      this.timeSinceHurt += dt;
+      if (this.timeSinceHurt >= 5 && this.hp < this.maxHp) {
+        this.hp = Math.min(this.maxHp, this.hp + 5 * dt);
+      }
+    }
     if (this.flash > 0) {
       this.flash -= dt;
       this.#applyFlash(Math.max(0, this.flash / 0.28));

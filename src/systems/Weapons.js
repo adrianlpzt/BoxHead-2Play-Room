@@ -7,40 +7,70 @@ export const WEAPONS = {
     name: 'Pistola', auto: false, cooldown: 0.2, damage: 34, pellets: 1,
     spread: 0.015, speed: 52, life: 1.4, shake: 0.05, knock: 3,
     tracer: 0xfff0a8, unlockAt: 0,
+    // Dual Pistols: más daño y dispara mucho más rápido.
+    upgradeAt: 55,
+    upgrade: { name: 'Dual Pistols', damage: 46, cooldown: 0.1, pellets: 2, spread: 0.05 },
   },
   shotgun: {
     // A quemarropa los cinco perdigones suman ~30 de empuje: manda la horda al suelo.
     name: 'Escopeta', auto: false, cooldown: 0.72, damage: 28, pellets: 5,
     spread: 0.17, speed: 42, life: 0.42, shake: 0.22, knock: 6,
-    tracer: 0xffc766, unlockAt: 3,
+    tracer: 0xffc766, unlockAt: 5,
+    // Súper Escopeta: más perdigones, más dispersión y empuje devastador.
+    upgradeAt: 60,
+    upgrade: { name: 'Súper Escopeta', pellets: 9, spread: 0.26, damage: 32, knock: 12, shake: 0.32 },
   },
   uzi: {
     name: 'Uzi', auto: true, cooldown: 0.072, damage: 17, pellets: 1,
     spread: 0.065, speed: 58, life: 1.2, shake: 0.035, knock: 1.1,
-    tracer: 0xbfe7ff, unlockAt: 6,
+    tracer: 0xbfe7ff, unlockAt: 15,
+    // Minigun: cadencia duplicada y dispersión reducida.
+    upgradeAt: 65,
+    upgrade: { name: 'Minigun', cooldown: 0.036, spread: 0.04, damage: 20, knock: 1.4 },
   },
-  barrel: { name: 'Barril', placeable: true, cooldown: 0.45, unlockAt: 2 },
-  mine: { name: 'Mina', placeable: true, cooldown: 0.5, unlockAt: 4 },
-  barricade: { name: 'Barricada', placeable: true, cooldown: 0.6, unlockAt: 4 },
-  turret: { name: 'Torreta', placeable: true, cooldown: 0.8, unlockAt: 6 },
+  barrel: { name: 'Barril', placeable: true, cooldown: 0.45, unlockAt: 3 },
+  mine: { name: 'Mina', placeable: true, cooldown: 0.5, unlockAt: 10 },
+  barricade: { name: 'Barricada', placeable: true, cooldown: 0.6, unlockAt: 8 },
+  turret: {
+    name: 'Torreta', placeable: true, cooldown: 0.8, unlockAt: 30,
+    // Torreta Pesada: más cadencia, más munición y más resistente.
+    upgradeAt: 75,
+    upgrade: { name: 'Torreta Pesada' },
+  },
   grenade: {
-    name: 'Granada', thrown: true, cooldown: 0.6, unlockAt: 5,
+    name: 'Granada', thrown: true, cooldown: 0.6, unlockAt: 20,
     // Parámetros del lanzamiento: velocidad horizontal, impulso vertical del arco,
     // mecha, y la explosión que dispara al detonar (reutiliza explodeAt).
     throwSpeed: 13, arcSpeed: 8, fuse: 1.2,
     blast: { radius: 5.5, damage: 130, playerDamage: 38, color: 0x8fae4a },
+    // Granadas de Racimo: al detonar se fragmenta en submuniciones encadenadas.
+    upgradeAt: 70,
+    upgrade: { name: 'Granadas de Racimo', cluster: 5 },
   },
   rocket: {
     // Vive en el mismo pool de proyectiles que pistola/uzi, pero con `splash`:
     // en vez de dañar a un único objetivo, detona con explodeAt en el punto de impacto.
     name: 'Cohete', auto: false, cooldown: 1.15, pellets: 1,
     spread: 0.008, speed: 34, life: 2.2, shake: 0.4, knock: 0,
-    tracer: 0xff6a3b, unlockAt: 8,
+    tracer: 0xff6a3b, unlockAt: 50,
     splash: { radius: 6, damage: 190, playerDamage: 50, color: 0xff8c4a },
   },
 };
 
 export const WEAPON_ORDER = ['pistol', 'shotgun', 'uzi', 'barrel', 'mine', 'barricade', 'turret', 'grenade', 'rocket'];
+
+/**
+ * Props efectivas de un arma. Si el jugador ha alcanzado su upgradeAt (registrado
+ * en game.upgraded), fusiona las props del upgrade sobre las base. WEAPONS nunca
+ * se muta, así el estado de mejora es por partida.
+ */
+export function effWeapon(game, id) {
+  const base = WEAPONS[id];
+  if (base.upgrade && game.upgraded && game.upgraded.has(id)) {
+    return { ...base, ...base.upgrade };
+  }
+  return base;
+}
 
 const BULLET_GEO = new THREE.BoxGeometry(0.12, 0.12, 0.75);
 const SHELL = { x: 0.1, y: 0.1, z: 0.22 };
@@ -86,7 +116,7 @@ export class WeaponSystem {
   }
 
   fire(game, weaponId, origin, aimDir) {
-    const w = WEAPONS[weaponId];
+    const w = effWeapon(game, weaponId);
     if (!w || w.placeable || this.cooldown > 0) return false;
 
     const baseAngle = Math.atan2(aimDir.x, aimDir.z);

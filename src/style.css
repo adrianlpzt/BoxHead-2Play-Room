@@ -46,8 +46,6 @@ html, body {
 
 /* Vida — abajo a la izquierda */
 .hud-life { left: 22px; bottom: 22px; width: 240px; }
-.bar-life { height: 18px; }
-#health-fill { background: var(--blood); transition: transform 0.12s linear; }
 .hud-life .readout { margin-top: 6px; }
 
 .bar-dash { height: 4px; margin-top: 8px; }
@@ -73,10 +71,7 @@ html, body {
 .hud-run { top: 18px; right: 22px; text-align: right; line-height: 1.55; }
 
 /* Magia — izquierda, entre la vida y el borde superior */
-.hud-magic { left: 22px; bottom: 118px; width: 190px; }
-.bar-essence { height: 8px; }
-#essence-fill { background: #6fd8f0; }
-.hud-magic .readout { margin: 4px 0 6px; }
+.hud-magic { left: 22px; bottom: 96px; width: 190px; }
 #spells { display: flex; gap: 6px; }
 .spell {
   display: flex; flex-direction: column; align-items: center; gap: 2px;
@@ -439,3 +434,7 @@ body.touch-device { touch-action: none; -webkit-user-select: none; user-select: 
 }
 .map-chip:hover { color: var(--ink); }
 .map-chip.sel { color: #0b0d12; background: var(--toxic); border-color: transparent; font-weight: 600; }
+
+/* Arma mejorada: borde ámbar para distinguirla en el arsenal */
+.slot.upgraded .name { color: var(--amber); font-weight: 600; }
+.slot.upgraded { border-right-color: var(--amber); }

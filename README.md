@@ -25,7 +25,7 @@ npm run start     # sirve el build de producción (lo que usa Railway)
 | Mover (8 direcciones) | `W` `A` `S` `D` |
 | Apuntar | Ratón |
 | Disparar / lanzar / colocar | Clic izquierdo o `Espacio` |
-| Cambiar arma | `1` Pistola · `2` Escopeta · `3` Uzi · `4` Barril · `5` Mina · `6` Granada · `7` Cohete |
+| Cambiar arma | `1`–`9` · o `Tab` (mantener) para la ruleta |
 | Soltar barril | `B` o clic derecho |
 | **Pisar del Titán** (magia) | `Q` |
 | **Nova de Hielo** (magia) | `E` |
@@ -34,25 +34,40 @@ npm run start     # sirve el build de producción (lo que usa Railway)
 | Silenciar sonido | `M` |
 | Reiniciar tras morir | `R` |
 
-## Progresión
+## Progresión — sistema arcade estilo Boxhead
 
-Todo se desbloquea por **multiplicador de combo** (sube con bajas seguidas,
-baja a x1 si se te enfría la racha 3,2 s):
+El **multiplicador** sube +1 con cada baja y no tiene tope práctico. Cada baja
+también rellena una barra de mantenimiento que **drena más rápido cuanto más
+alto es el multiplicador** (a x1 dura ~4 s; a x50, ~1 s). Si la barra se vacía,
+el multiplicador baja un escalón. El sistema premia cazar activamente, no
+acampar: para llegar a multiplicadores altos hay que matar sin descanso.
 
-| Desbloqueo | Multiplicador |
-|---|---|
-| Barril | x2 |
-| Escopeta | x3 |
-| **Pisar del Titán** | x3 |
-| Mina | x4 |
-| Granada | x5 |
-| Uzi | x6 |
-| **Nova de Hielo** | x7 |
-| Cohete | x8 |
+Las armas y magias se **desbloquean al alcanzar milestones** de multiplicador:
 
-La munición de cada arma también se repone con el combo (ver
-`ARQUITECTURA.md` para las cifras exactas) y con pickups que sueltan los
-zombis al morir — incluidos orbes de **Esencia** para las magias.
+| Desbloqueo | Milestone | Desbloqueo | Milestone |
+|---|---|---|---|
+| Barril | x3 | Uzi | x15 |
+| Escopeta | x5 | Granada | x20 |
+| Barricada | x8 | Torreta | x30 |
+| Mina | x10 | Cohete | x50 |
+| **Pisar del Titán** | x12 | **Nova de Hielo** | x35 |
+
+Por encima de x50, en vez de armas nuevas, tu arsenal **se potencia**:
+
+| Upgrade | Milestone | Efecto |
+|---|---|---|
+| Dual Pistols | x55 | +daño, cadencia alta, 2 balas |
+| Súper Escopeta | x60 | 9 perdigones, empuje devastador |
+| Minigun | x65 | cadencia casi duplicada, menos dispersión |
+| Granadas de Racimo | x70 | fragmenta en 5 submuniciones encadenadas |
+| Torreta Pesada | x75 | doble vida y munición, más cadencia |
+
+La munición se repone con el combo y con pickups que sueltan los zombis
+(incluidos orbes de **Esencia** para las magias). **Regeneración:** tras 5 s
+sin recibir daño, recuperas 5 de vida por segundo.
+
+La vida (roja) y la esencia (cian) se muestran en **barras flotantes sobre el
+personaje**, no en el overlay.
 
 ---
 

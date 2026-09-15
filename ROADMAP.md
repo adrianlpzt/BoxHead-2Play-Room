@@ -278,3 +278,31 @@ arcade actual se queda como está (es coherente y bueno). El **roguelike estrena
 la tienda/mejoras entre rondas** — ahí la compra tiene todo el sentido y no
 canibaliza el arcade. Así cada modo tiene su identidad económica en vez de un
 compromiso tibio para ambos.
+
+---
+
+## Sesión: rework del arcade estilo Boxhead original
+
+- [x] **Multiplicador con decay acelerado.** Se separó multiplicador y racha:
+  cada baja sube el multiplicador (hasta x99) y rellena una barra de
+  mantenimiento que drena a `0.25 + mult·0.015` por segundo — a x1 dura ~4s, a
+  x50 apenas ~1s. Al vaciarse, el multiplicador baja UN escalón (no a x1 de
+  golpe). Fuerza el playstyle agresivo del original: para sostener un
+  multiplicador alto hay que matar sin parar.
+- [x] **Milestones de desbloqueo reescalados** (antes lineales x2-x8, ahora
+  hitos altos): barril x3, escopeta x5, barricada x8, mina x10, uzi x15,
+  granada x20, torreta x30, cohete x50. Magias: Titán x12, Nova x35.
+- [x] **Upgrades de arma por milestone extremo (todos > x50).** Sistema
+  `effWeapon()`: fusiona props de `upgrade` sobre la base sin mutar WEAPONS
+  (estado por partida en `game.upgraded`). Tabla:
+  - Pistola → **Dual Pistols** (x55): +daño, mucha más cadencia, 2 balas.
+  - Súper Escopeta (x60): 9 perdigones, más dispersión y knockback 12.
+  - Minigun (x65): cadencia casi duplicada, dispersión reducida.
+  - Granadas de Racimo (x70): al detonar esparce 5 submuniciones encadenadas
+    (`cluster` en Grenades.js; las hijas no re-fragmentan).
+  - Torreta Pesada (x75): x2 vida y munición, +cadencia, +daño, color ámbar.
+- [x] **Regeneración de vida.** Tras 5 s sin recibir daño, +5 vida/s
+  (`timeSinceHurt` en Player). Se reinicia con cada golpe.
+- [x] **Vida y esencia como barras flotantes 3D** sobre el jugador
+  (`entities/FloatingBars.js`), billboard hacia la cámara, fuera del overlay.
+  La vida vira ámbar→rojo al bajar.

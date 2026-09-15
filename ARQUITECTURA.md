@@ -441,18 +441,35 @@ oleada 4), `bomber` hasta 24% (desde oleada 2); el resto, `zombie` común.
 
 ---
 
-## 14. Combo y economía
+## 14. Combo y economía (sistema arcade estilo Boxhead)
 
-- Cada baja: `combo+=1`, ventana de **3,2s** que se reinicia
-  (`comboWindow`), multiplicador `min(10, combo)`. Si la ventana se agota,
-  vuelve a x1.
+- **Multiplicador con decay acelerado** (reescrito respecto al modelo viejo de
+  ventana fija). Cada baja: `combo+=1`, `multiplier = min(99, multiplier+1)`, y
+  la barra de mantenimiento `decay` se rellena a 1. En el bucle, `decay` drena a
+  `decayRate() = 0.25 + multiplier·0.015` por segundo (a x1 dura ~4s, a x50
+  ~1s). Al llegar a 0, el multiplicador baja UN escalón y `decay` se rellena a
+  0.55; solo al caer a x1 se resetea `combo`. Fuerza el playstyle agresivo.
 - Puntos por baja = puntos del enemigo × multiplicador.
+- **Desbloqueo por milestone** (`unlockByMultiplier`): barril x3, escopeta x5,
+  barricada x8, mina x10, uzi x15, granada x20, torreta x30, cohete x50.
+  Magias: Titán x12, Nova x35.
+- **Upgrades por milestone extremo** (misma función, campo `upgradeAt`/`upgrade`
+  en WEAPONS, estado en `game.upgraded`, aplicado vía `effWeapon()`): Dual
+  Pistols x55, Súper Escopeta x60, Minigun x65, Granadas de Racimo x70, Torreta
+  Pesada x75. `effWeapon(game,id)` fusiona el upgrade sobre la base sin mutar
+  WEAPONS. Casos especiales: `cluster` (granada, en Grenades.js — fragmenta en
+  submuniciones que no re-fragmentan) y `heavy` (torreta, flag en el
+  constructor de Turret que dobla vida/munición y sube cadencia/daño).
 - Munición por combo (en `registerKill()`): +1 escopeta cada 2 bajas, +3
-  uzi por baja, +1 barril cada 6, +1 mina cada 5, +1 granada cada 7, +1
-  cohete cada 12.
-- Esencia por combo: `+2 + multiplicador×0.6` cada baja (ver §8).
+  uzi por baja, +1 barril cada 6, +1 mina cada 5, +1 barricada cada 8, +1
+  turret cada 15, +1 granada cada 7, +1 cohete cada 12.
+- Esencia por combo: `+2 + multiplicador×0.4` cada baja (ver §8).
+- **Regeneración de vida**: tras 5s sin recibir daño (`player.timeSinceHurt`),
+  +5 vida/s. Se reinicia con cada golpe.
 - Al limpiar oleada *n*: `+50×n` puntos, +6 escopeta, +40 uzi, +2 barril,
   +1 mina, +2 granada, +1 cohete.
+- **Vida y esencia en barras flotantes 3D** (`entities/FloatingBars.js`), no en
+  el overlay: billboard sobre la cabeza del jugador, la vida vira ámbar→rojo.
 - **Pickups** (`Pickup.js`, `maybeDrop()` en `main.js`): orbe de esencia
   22% independiente; luego, si `shotgun<6 && uzi<25` ("seco") 50% de
   probabilidad de soltar algo — prioriza salud si `hp<45`, si no uzi/
