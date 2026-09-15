@@ -273,7 +273,13 @@ export class Zombie {
       }
     }
 
-    const target = game.player.position;
+    // En multijugador, persigue al jugador más cercano.
+    let target = game.player.position;
+    if (game.player2 && !game.player2.dead) {
+      const d1 = distXZ(this.position, game.player.position);
+      const d2 = distXZ(this.position, game.player2.position);
+      if (d2 < d1) target = game.player2.position;
+    }
     const dx = target.x - this.position.x;
     const dz = target.z - this.position.z;
     const d = Math.hypot(dx, dz) || 1;
@@ -399,6 +405,13 @@ export class Zombie {
       game.player.takeDamage(this.cfg.damage, game);
       this.attackCd = 0.85;
       game.arena.damageCrates(this.position, this.radius + 1.2, 9, game);
+    }
+    // También ataca al Player2 si está cerca.
+    if (this.attackCd <= 0 && game.player2 && !game.player2.dead) {
+      if (distXZ(this.position, game.player2.position) < this.radius + game.player2.radius + 0.25) {
+        game.player2.takeDamage(this.cfg.damage, game);
+        this.attackCd = 0.85;
+      }
     }
 
     // La horda también machaca las torretas que tenga pegadas.

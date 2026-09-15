@@ -8,10 +8,11 @@ import { MAPS, MAP_ORDER } from '../world/Maps.js';
  * multiplayer).
  */
 export class Menu {
-  constructor(ranking, net, { onPlay }) {
+  constructor(ranking, net, { onPlay, onPlayMulti }) {
     this.ranking = ranking;
     this.net = net;
     this.onPlay = onPlay;
+    this.onPlayMulti = onPlayMulti || (() => {});
     this.visible = true;
     this.mapId = localStorage.getItem('boxhead3d.map') || 'box';
     if (!MAP_ORDER.includes(this.mapId)) this.mapId = 'box';
@@ -162,12 +163,16 @@ export class Menu {
           status.textContent = 'Jugador conectado, estableciendo enlace…';
         };
         this.net.onConnected = () => {
-          status.textContent = '¡Conectado! (enlace directo establecido)';
-          // Fase A: solo mostramos que funciona. En Fase B/C arrancará la partida.
+          status.textContent = '¡Conectado! Arrancando partida…';
           this.net.send({ type: 'hello', name: localStorage.getItem('boxhead3d.name') || 'HOST' });
+          // Arranca la partida como host.
+          setTimeout(() => {
+            this.hide();
+            this.onPlayMulti('host', this.mapId);
+          }, 500);
         };
         this.net.onData = (msg) => {
-          if (msg.type === 'hello') status.textContent = `¡${msg.name} conectado! Enlace P2P activo.`;
+          if (msg.type === 'hello') status.textContent = `¡${msg.name} conectado!`;
         };
         this.net.onError = (msg) => { status.textContent = `Error: ${msg}`; };
         this.net.onDisconnected = (reason) => { status.textContent = `Desconectado: ${reason}`; };
@@ -183,11 +188,15 @@ export class Menu {
       status.textContent = `Uniéndose a ${code}…`;
       try {
         this.net.onConnected = () => {
-          status.textContent = '¡Conectado! (enlace directo establecido)';
+          status.textContent = '¡Conectado! Arrancando partida…';
           this.net.send({ type: 'hello', name: localStorage.getItem('boxhead3d.name') || 'GUEST' });
+          setTimeout(() => {
+            this.hide();
+            this.onPlayMulti('guest', this.mapId);
+          }, 500);
         };
         this.net.onData = (msg) => {
-          if (msg.type === 'hello') status.textContent = `¡${msg.name} conectado! Enlace P2P activo.`;
+          if (msg.type === 'hello') status.textContent = `¡${msg.name} conectado!`;
         };
         this.net.onError = (msg) => { status.textContent = `Error: ${msg}`; };
         this.net.onDisconnected = (reason) => { status.textContent = `Desconectado: ${reason}`; };

@@ -26,6 +26,8 @@ import { Menu } from './core/Menu.js';
 import { Ranking } from './core/Ranking.js';
 import { TouchControls } from './core/TouchControls.js';
 import { Net } from './core/Net.js';
+import { HostSession } from './net/HostSession.js';
+import { GuestSession } from './net/GuestSession.js';
 import { CameraRig } from './core/CameraRig.js';
 import { SpatialHash } from './core/SpatialHash.js';
 import { circleHitsBox, distXZ, resolveCircleBox } from './core/Collision.js';
@@ -103,14 +105,34 @@ const wheel = new WeaponWheel();
 const ranking = new Ranking();
 const net = new Net();
 let pendingName = localStorage.getItem('boxhead3d.name') || '';
+let netSession = null; // HostSession | GuestSession | null
+let isGuest = false;
+
 const menu = new Menu(ranking, net, {
   onPlay: (name, mapId) => {
     pendingName = name;
+    isGuest = false;
+    netSession = null;
     if (mapId && MAP_ORDER.includes(mapId)) {
       currentMap = mapId;
       localStorage.setItem('boxhead3d.map', mapId);
     }
     startGame();
+  },
+  onPlayMulti: (role, mapId) => {
+    pendingName = localStorage.getItem('boxhead3d.name') || '';
+    if (mapId && MAP_ORDER.includes(mapId)) {
+      currentMap = mapId;
+      localStorage.setItem('boxhead3d.map', mapId);
+    }
+    isGuest = role === 'guest';
+    startGame();
+    // Crear la sesión de red DESPUÉS de startGame (que resetea el mundo).
+    if (role === 'host') {
+      netSession = new HostSession(game, net, scene);
+    } else {
+      netSession = new GuestSession(game, net, scene, input);
+    }
   },
 });
 
@@ -135,8 +157,10 @@ let hitstop = 0;
 
 const game = {
   scene, arena, decals, particles, debris, shells, weapons, fireballs, grenades, shockwaves,
-  player, audio, grid,
+  player, audio, grid, rig,
   walls: arena.walls,
+  player2: null,   // segundo jugador (gestionado por HostSession en multi)
+  weapon2: 'pistol',
   zombies: [],
   barrels: [],
   mines: [],
@@ -606,6 +630,12 @@ function startGame() {
 /** Vuelve al menú principal desde el game over. */
 function returnToMenu() {
   hud.hideGameOver();
+  if (netSession) {
+    netSession.dispose();
+    netSession = null;
+    net.disconnect('Vuelve al menú');
+  }
+  isGuest = false;
   game.state = 'menu';
   menu.show();
 }
@@ -663,65 +693,92 @@ function tick() {
     updateAim();
     input.moveVector(moveDir);
 
-    WEAPON_ORDER.forEach((id, i) => {
-      if (input.tapped(`Digit${i + 1}`)) selectWeapon(id);
-    });
-    if (input.tapped('KeyB') && game.unlocked.has('barrel')) {
-      if (game.weapon === 'barrel') placeBarrel();
-      else selectWeapon('barrel');
-    }
-    if (input.altTapped) placeBarrel();
-    if (input.tapped('ShiftLeft') || input.tapped('ShiftRight')) player.dash(moveDir, game);
-    if (input.tapped('KeyQ')) castSpell('stomp');
-    if (input.tapped('KeyE')) castSpell('frostnova');
-
-    player.update(dt, moveDir, aimPoint, game);
-    if (!wheel.open) handleShooting();
-
-    // La cuadrícula se reconstruye antes de mover balas y bolas de fuego, para
-    // que las consultas de impacto sean O(vecinos) y no O(enemigos).
-    grid.build(game.zombies);
-    weapons.update(dt, game);
-    fireballs.update(dt, game);
-    grenades.update(dt, game);
-
-    for (const z of game.zombies) z.update(dt, game);
-    separateZombies();
-    for (const b of game.barrels) b.update(dt, game);
-    for (const m of game.mines) m.update(dt, game);
-    for (const t of game.turrets) t.update(dt, game);
-    for (const c of game.corpses) c.update(dt, game);
-    for (const pk of game.pickups) pk.update(dt, game);
-
-    sweep(game.zombies);
-    sweep(game.barrels);
-    sweep(game.mines);
-    sweep(game.turrets);
-    sweep(game.corpses);
-    sweep(game.pickups);
-
-    // Drenaje del multiplicador. La barra baja a una velocidad que crece con la
-    // altura; al vaciarse, el multiplicador cae un escalón y la barra se rellena
-    // parcialmente — así perder x40 no te manda de golpe a x1, pero mantenerlo
-    // alto exige matar constantemente.
-    if (game.multiplier > 1) {
-      game.decay -= game.decayRate() * dt;
-      if (game.decay <= 0) {
-        game.multiplier = Math.max(1, game.multiplier - 1);
-        game.decay = game.multiplier > 1 ? 0.55 : 0;
-        if (game.multiplier === 1) game.combo = 0;
-      }
+    if (isGuest) {
+      // --- GUEST: solo mueve su player (predicción local) y envía inputs ---
+      // No simula zombis, oleadas, colisiones de balas ni nada del mundo.
+      WEAPON_ORDER.forEach((id, i) => {
+        if (input.tapped(`Digit${i + 1}`)) selectWeapon(id);
+      });
+      player.update(dt, moveDir, aimPoint, game);
+      if (netSession) netSession.update(dt);
     } else {
-      game.decay = 0;
-      game.combo = 0;
-    }
+      // --- HOST (o singleplayer): simulación completa ---
+      WEAPON_ORDER.forEach((id, i) => {
+        if (input.tapped(`Digit${i + 1}`)) selectWeapon(id);
+      });
+      if (input.tapped('KeyB') && game.unlocked.has('barrel')) {
+        if (game.weapon === 'barrel') placeBarrel();
+        else selectWeapon('barrel');
+      }
+      if (input.altTapped) placeBarrel();
+      if (input.tapped('ShiftLeft') || input.tapped('ShiftRight')) player.dash(moveDir, game);
+      if (input.tapped('KeyQ')) castSpell('stomp');
+      if (input.tapped('KeyE')) castSpell('frostnova');
 
-    for (const id of SPELL_ORDER) {
-      if (game.spellCooldowns[id] > 0) game.spellCooldowns[id] -= dt;
-    }
+      player.update(dt, moveDir, aimPoint, game);
+      if (!wheel.open) handleShooting();
 
-    waves.update(dt);
-    updateBlackout(dt);
+      // Player2 disparo: el host también maneja el disparo del guest.
+      if (game.player2 && !game.player2.dead && netSession instanceof HostSession) {
+        const gi = netSession.guestInput;
+        if (gi.w) game.weapon2 = gi.w;
+        if (gi.f && weapons.canFire() && game.ammo[gi.w] > 0) {
+          const p2 = game.player2;
+          const p2muzzle = p2.muzzle();
+          const p2dir = new THREE.Vector3(Math.sin(gi.aim), 0, Math.cos(gi.aim));
+          const w = effWeapon(game, gi.w);
+          if (w && !w.placeable && !w.thrown && !w.beam) {
+            weapons.fire(game, gi.w, p2muzzle, p2dir);
+          }
+        }
+        if (gi.sp) {
+          castSpell(gi.sp);
+          gi.sp = null;
+        }
+      }
+
+      grid.build(game.zombies);
+      weapons.update(dt, game);
+      fireballs.update(dt, game);
+      grenades.update(dt, game);
+
+      for (const z of game.zombies) z.update(dt, game);
+      separateZombies();
+      for (const b of game.barrels) b.update(dt, game);
+      for (const m of game.mines) m.update(dt, game);
+      for (const t of game.turrets) t.update(dt, game);
+      for (const c of game.corpses) c.update(dt, game);
+      for (const pk of game.pickups) pk.update(dt, game);
+
+      sweep(game.zombies);
+      sweep(game.barrels);
+      sweep(game.mines);
+      sweep(game.turrets);
+      sweep(game.corpses);
+      sweep(game.pickups);
+
+      if (game.multiplier > 1) {
+        game.decay -= game.decayRate() * dt;
+        if (game.decay <= 0) {
+          game.multiplier = Math.max(1, game.multiplier - 1);
+          game.decay = game.multiplier > 1 ? 0.55 : 0;
+          if (game.multiplier === 1) game.combo = 0;
+        }
+      } else {
+        game.decay = 0;
+        game.combo = 0;
+      }
+
+      for (const id of SPELL_ORDER) {
+        if (game.spellCooldowns[id] > 0) game.spellCooldowns[id] -= dt;
+      }
+
+      waves.update(dt);
+      updateBlackout(dt);
+
+      // Host: actualiza la sesión de red (envía snapshot, aplica inputs del guest).
+      if (netSession) netSession.update(dt);
+    }
   }
 
   particles.update(dt);

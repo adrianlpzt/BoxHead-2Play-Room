@@ -441,3 +441,36 @@ un código de sala. Cero lógica de juego todavía.**
   esperar al host, y reconcilia cuando llega la confirmación. Solo si el
   input-lag se nota en la práctica (con DataChannel `ordered:false` debería
   ser <50ms en la mayoría de conexiones domésticas).
+
+---
+
+## Online Fase B+C — partida cooperativa funcional
+
+- [x] **HostSession** (`net/HostSession.js`): crea Player2 como avatar del
+  guest en la simulación del host. Envía snapshots del mundo entero a 15Hz
+  (todos los zombis, barriles, minas, torretas, pickups, cadáveres + ambos
+  jugadores). Recibe inputs del guest y los aplica a Player2 (movimiento,
+  apuntado, disparo, dash, magias). Añade Player2 al CameraRig para que la
+  cámara encuadre a ambos.
+- [x] **GuestSession** (`net/GuestSession.js`): recibe los snapshots y
+  sincroniza entidades ghost (crea/actualiza/destruye objetos Three.js sin
+  simular IA ni física). El player local se mueve por predicción
+  (respuesta instantánea al input) y se corrige suavemente con los datos
+  del host. Envía inputs empaquetados cada frame.
+- [x] **Snapshot** (`net/Snapshot.js`): serialización compacta del estado
+  del mundo (posiciones cuantizadas a cm, rotaciones a 1 decimal).
+- [x] **Zombie persigue al más cercano** de ambos jugadores y ataca a
+  cualquiera de los dos si está en contacto.
+- [x] **main.js**: rama guest/host en el bucle — el guest no simula mundo
+  (sin oleadas, sin IA, sin explosiones), solo mueve su player y pinta lo
+  que dice el snapshot. El host ejecuta la simulación completa más el
+  update de la sesión de red.
+- [x] **Desconexión limpia**: al volver al menú se destruyen los ghosts/
+  Player2 y se cierra la conexión.
+
+### Qué falta aún del online
+- **Fase D (predicción)**: si el input-lag se nota, añadir reconciliación
+  local en el guest. Con DataChannel unreliable debería ser <50ms en la
+  mayoría de conexiones — quizá no haga falta.
+- **Reconexión**: si el WebRTC se cae, no hay intento de reconectar.
+- **Más de 2 jugadores**: la señalización ya solo acepta 1 host + 1 guest.
