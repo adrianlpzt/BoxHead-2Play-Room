@@ -438,3 +438,26 @@ body.touch-device { touch-action: none; -webkit-user-select: none; user-select: 
 /* Arma mejorada: borde ámbar para distinguirla en el arsenal */
 .slot.upgraded .name { color: var(--amber); font-weight: 600; }
 .slot.upgraded { border-right-color: var(--amber); }
+
+/* Formulario de unirse a sala */
+.join-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  justify-content: center;
+}
+.join-row input {
+  padding: 10px 12px;
+  font-family: inherit;
+  font-size: 18px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-align: center;
+  width: 120px;
+  color: var(--ink);
+  background: rgba(10, 12, 16, 0.9);
+  border: 1px solid rgba(232, 228, 217, 0.3);
+}
+.join-row input:focus { outline: none; border-color: var(--toxic); }
+#multi-status { margin-top: 14px; min-height: 1.6em; }
+#multi-status b { color: var(--toxic); letter-spacing: 0.15em; }

@@ -8,8 +8,9 @@ import { MAPS, MAP_ORDER } from '../world/Maps.js';
  * multiplayer).
  */
 export class Menu {
-  constructor(ranking, { onPlay }) {
+  constructor(ranking, net, { onPlay }) {
     this.ranking = ranking;
+    this.net = net;
     this.onPlay = onPlay;
     this.visible = true;
     this.mapId = localStorage.getItem('boxhead3d.map') || 'box';
@@ -136,15 +137,70 @@ export class Menu {
     this.root.innerHTML = `
       <div class="menu-panel">
         <h2 class="menu-h2">Multijugador</h2>
-        <p class="menu-text">
-          El cooperativo online por <b>ID de sala</b> está en camino. Funcionará
-          creando o uniéndote a una sala con un código corto para jugar la misma
-          arena con un amigo.
-        </p>
-        <p class="menu-text dim">Próximamente en una actualización.</p>
+        <p class="menu-text">Juega con un amigo: uno crea la sala, el otro se une con el código.</p>
+        <nav class="menu-nav">
+          <button data-act="create-room" class="menu-btn primary">Crear sala</button>
+        </nav>
+        <div class="join-row">
+          <input id="room-input" maxlength="4" placeholder="CÓDIGO" autocomplete="off" />
+          <button data-act="join-room" class="menu-btn">Unirse</button>
+        </div>
+        <p id="multi-status" class="menu-text dim"></p>
         ${this.#backButton()}
       </div>`;
     this.#wireBack();
+
+    const status = this.root.querySelector('#multi-status');
+
+    this.root.querySelector('[data-act="create-room"]').onclick = async () => {
+      status.textContent = 'Creando sala…';
+      try {
+        this.net.onRoomCreated = (code) => {
+          status.innerHTML = `Sala <b>${code}</b> — esperando al otro jugador…`;
+        };
+        this.net.onPeerJoined = () => {
+          status.textContent = 'Jugador conectado, estableciendo enlace…';
+        };
+        this.net.onConnected = () => {
+          status.textContent = '¡Conectado! (enlace directo establecido)';
+          // Fase A: solo mostramos que funciona. En Fase B/C arrancará la partida.
+          this.net.send({ type: 'hello', name: localStorage.getItem('boxhead3d.name') || 'HOST' });
+        };
+        this.net.onData = (msg) => {
+          if (msg.type === 'hello') status.textContent = `¡${msg.name} conectado! Enlace P2P activo.`;
+        };
+        this.net.onError = (msg) => { status.textContent = `Error: ${msg}`; };
+        this.net.onDisconnected = (reason) => { status.textContent = `Desconectado: ${reason}`; };
+        await this.net.createRoom();
+      } catch (e) {
+        status.textContent = `Error: ${e.message}`;
+      }
+    };
+
+    this.root.querySelector('[data-act="join-room"]').onclick = async () => {
+      const code = this.root.querySelector('#room-input').value.toUpperCase().trim();
+      if (code.length !== 4) { status.textContent = 'Introduce un código de 4 caracteres.'; return; }
+      status.textContent = `Uniéndose a ${code}…`;
+      try {
+        this.net.onConnected = () => {
+          status.textContent = '¡Conectado! (enlace directo establecido)';
+          this.net.send({ type: 'hello', name: localStorage.getItem('boxhead3d.name') || 'GUEST' });
+        };
+        this.net.onData = (msg) => {
+          if (msg.type === 'hello') status.textContent = `¡${msg.name} conectado! Enlace P2P activo.`;
+        };
+        this.net.onError = (msg) => { status.textContent = `Error: ${msg}`; };
+        this.net.onDisconnected = (reason) => { status.textContent = `Desconectado: ${reason}`; };
+        await this.net.joinRoom(code);
+      } catch (e) {
+        status.textContent = `Error: ${e.message}`;
+      }
+    };
+
+    // Enter en el campo de código = unirse.
+    this.root.querySelector('#room-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') this.root.querySelector('[data-act="join-room"]').click();
+    });
   }
 
   #renderHelp() {

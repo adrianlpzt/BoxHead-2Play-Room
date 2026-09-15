@@ -117,10 +117,16 @@ export class Arena {
     this.#buildCrates();
 
     this.spawnPoints = [
+      // Esquinas (los clásicos).
       new THREE.Vector3(-this.half + 4, 0, -this.half + 4),
       new THREE.Vector3(this.half - 4, 0, -this.half + 4),
       new THREE.Vector3(-this.half + 4, 0, this.half - 4),
       new THREE.Vector3(this.half - 4, 0, this.half - 4),
+      // Puntos medios de cada borde: reduce el viaje cuando el jugador está a un lado.
+      new THREE.Vector3(0, 0, -this.half + 4),
+      new THREE.Vector3(0, 0, this.half - 4),
+      new THREE.Vector3(-this.half + 4, 0, 0),
+      new THREE.Vector3(this.half - 4, 0, 0),
     ];
   }
 
@@ -260,8 +266,28 @@ export class Arena {
       0,
       best.z + (Math.random() - 0.5) * 5
     );
-    // Nace garantizadamente dentro del rectángulo jugable. El clamp de mundo en
-    // Zombie.update lo mantiene dentro después pase lo que pase.
+    const lim = this.half - 1.5;
+    pos.x = Math.max(-lim, Math.min(lim, pos.x));
+    pos.z = Math.max(-lim, Math.min(lim, pos.z));
+    return pos;
+  }
+
+  /**
+   * Punto de aparición a distancia media del jugador (10-18 unidades), en un
+   * ángulo aleatorio — pero NO justo delante de él, para que no se materialicen
+   * a la vista. Genera un flujo sostenido de zombis cercanos en oleadas altas,
+   * que es lo que faltaba para sostener combos largos.
+   */
+  nearSpawn(playerPos, playerAngle) {
+    const dist = 10 + Math.random() * 8;
+    // Ángulo: trasero o lateral, nunca frontal (±90° del jugador).
+    const offset = (0.5 + Math.random()) * Math.PI; // entre 90° y 270° respecto a donde mira
+    const a = playerAngle + offset;
+    const pos = new THREE.Vector3(
+      playerPos.x + Math.sin(a) * dist,
+      0,
+      playerPos.z + Math.cos(a) * dist
+    );
     const lim = this.half - 1.5;
     pos.x = Math.max(-lim, Math.min(lim, pos.x));
     pos.z = Math.max(-lim, Math.min(lim, pos.z));

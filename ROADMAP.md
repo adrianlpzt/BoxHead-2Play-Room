@@ -386,3 +386,58 @@ un código de sala. Cero lógica de juego todavía.**
   real que los obedece.
 - Fase D: pulido — predicción local en el invitado si el input-a-host-y-
   vuelta se nota, solo después de que la tubería funcione de punta a punta.
+
+---
+
+## Sesión: rebalanceo de oleadas + Online Fase A
+
+### Completado
+
+- [x] **Rebalanceo de densidad de oleadas.** Dos mecanismos simultáneos:
+  1. **Spawn clásico ampliado**: 8 puntos en vez de 4 (esquinas + bordes),
+     presupuesto más agresivo (oleada 20: 126 zombis → 126, oleada 30: 211,
+     oleada 50: 411).
+  2. **Trickle de densidad** (NUEVO): vigila cuántos zombis hay a <14u del
+     jugador; si son menos del `nearbyTarget` (escalado con la oleada, hasta
+     20 en oleadas altas), rellena desde puntos a **media distancia** (10-18u)
+     por detrás/laterales del jugador, a un ritmo proporcional al déficit.
+     No gasta presupuesto: es spawn extra para mantener el flujo. Esto elimina
+     el hueco muerto entre olas que impedía sostener combos largos.
+  3. **Spawn cercano** (`Arena.nearSpawn`): genera un punto a 10-18u del
+     jugador en un ángulo aleatorio, pero nunca justo delante (±90° de donde
+     mira), para que no se materialicen a la vista.
+- [x] **Online Fase A — señalización + código de sala + WebRTC handshake.**
+  - **Servidor** (`server/signal.mjs`): WebSocket con `ws`, protocolo JSON.
+    `create` genera código de 4 caracteres, `join` empareja, `signal` reenvía
+    SDP/ICE. Limpieza de salas zombis cada 5 min. Desplegado como segundo
+    servicio en Railway (`boxhead-signal`,
+    `f447f9e8-0518-4ed2-bd00-4c90bfd89319`), dominio
+    `boxhead-signal-production.up.railway.app`.
+  - **Cliente** (`src/core/Net.js`): envuelve WebSocket + RTCPeerConnection +
+    DataChannel. STUN público (Google), sin TURN. API por callbacks
+    (`onConnected`, `onData`, `send`, `onDisconnected`).
+  - **Menú** (`core/Menu.js`): "Multijugador" ahora tiene **Crear sala** y
+    **Unirse** con campo de código. Muestra el estado en tiempo real (sala
+    creada, esperando, conectado, error).
+  - **Entregable**: dos pestañas/dispositivos intercambian un `hello` con su
+    nombre por DataChannel usando un código de sala. Cero lógica de juego —
+    eso es Fase B/C.
+
+### Infraestructura Railway actual (2 servicios en el mismo proyecto)
+
+| Servicio | ID | Dominio | Root | Función |
+|---|---|---|---|---|
+| boxhead-3d | b18388ec… | boxhead-3d-production.up.railway.app | `/` (raíz) | El juego (Vite build estático) |
+| boxhead-signal | f447f9e8… | boxhead-signal-production.up.railway.app | `/server` | Señalización WebSocket |
+
+### Fases siguientes del online (no implementadas)
+
+- **Fase B**: el host manda snapshots del mundo (posiciones de zombis,
+  barriles, proyectiles); el invitado solo pinta. Modo espectador.
+- **Fase C**: el invitado manda inputs (`{move, aim, fire, spell}`); el host
+  genera un segundo jugador real (`Player2`) que los obedece. Ambos ven a
+  ambos jugadores y a los mismos zombis.
+- **Fase D**: predicción local — el invitado mueve su personaje localmente sin
+  esperar al host, y reconcilia cuando llega la confirmación. Solo si el
+  input-lag se nota en la práctica (con DataChannel `ordered:false` debería
+  ser <50ms en la mayoría de conexiones domésticas).

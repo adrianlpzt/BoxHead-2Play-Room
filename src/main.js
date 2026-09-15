@@ -25,6 +25,7 @@ import { WeaponWheel } from './core/WeaponWheel.js';
 import { Menu } from './core/Menu.js';
 import { Ranking } from './core/Ranking.js';
 import { TouchControls } from './core/TouchControls.js';
+import { Net } from './core/Net.js';
 import { CameraRig } from './core/CameraRig.js';
 import { SpatialHash } from './core/SpatialHash.js';
 import { circleHitsBox, distXZ, resolveCircleBox } from './core/Collision.js';
@@ -100,8 +101,9 @@ if (isTouch) touch.enable();
 const hud = new HUD();
 const wheel = new WeaponWheel();
 const ranking = new Ranking();
+const net = new Net();
 let pendingName = localStorage.getItem('boxhead3d.name') || '';
-const menu = new Menu(ranking, {
+const menu = new Menu(ranking, net, {
   onPlay: (name, mapId) => {
     pendingName = name;
     if (mapId && MAP_ORDER.includes(mapId)) {

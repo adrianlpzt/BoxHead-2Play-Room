@@ -1,0 +1,12 @@
+{
+  "name": "boxhead3d-signal",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "node signal.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

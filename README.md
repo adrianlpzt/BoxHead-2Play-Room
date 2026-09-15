@@ -74,10 +74,11 @@ personaje**, no en el overlay.
 ## Despliegue — cómo está montado
 
 - **Repo:** https://github.com/adrianlpzt/BoxHead-2Play-Room (rama `main`)
-- **Railway:** proyecto `boxhead-3d`, un único servicio conectado a ese repo.
-  Cada `git push` a `main` dispara un build y despliegue automáticos
-  (Railway detecta Node vía `package.json`, corre `npm run build` y luego
-  `npm run start`).
+- **Railway:** proyecto `boxhead-3d`, **dos servicios** conectados al repo:
+  - `boxhead-3d` (raíz `/`) — el juego, Vite build estático
+  - `boxhead-signal` (raíz `/server`) — servidor de señalización WebSocket
+    para el multijugador
+  Cada `git push` a `main` redespliega ambos automáticamente.
 - **`vite.config.js`** tiene `preview.allowedHosts: true`. Es obligatorio:
   sin eso, `vite preview` rechaza cualquier petición cuyo header `Host` no
   sea `localhost` (protección anti DNS-rebinding), y Railway enruta con su
