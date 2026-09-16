@@ -158,6 +158,7 @@ let hitstop = 0;
 const game = {
   scene, arena, decals, particles, debris, shells, weapons, fireballs, grenades, shockwaves,
   player, audio, grid, rig,
+  netEvents: [], // disparos/golpes/muertes desde el último snapshot (solo host)
   walls: arena.walls,
   player2: null,   // segundo jugador (gestionado por HostSession en multi)
   weapon2: 'pistol',
@@ -605,6 +606,7 @@ function resetGame() {
   game.ammo = { pistol: Infinity, shotgun: 12, uzi: 90, barrel: 2, mine: 2, barricade: 2, turret: 1, grenade: 3, rocket: 1 };
   game.essence = 20;
   game.unlockedSpells = new Set();
+  game.netEvents.length = 0;
   game.spellCooldowns = { stomp: 0, frostnova: 0 };
   game.trauma = 0;
   game.state = 'playing';

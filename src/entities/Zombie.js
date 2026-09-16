@@ -209,6 +209,15 @@ export class Zombie {
       }
     }
 
+    if (game.netEvents) {
+      game.netEvents.push({
+        k: shatter ? 'shatter' : 'hit',
+        x: Math.round(this.position.x * 100) / 100,
+        z: Math.round(this.position.z * 100) / 100,
+        c: this.cfg.skin, b: this.cfg.blood,
+      });
+    }
+
     if (this.hp <= 0) {
       this.die(game, fromDir, { ...opts, shatter });
       return 'kill';
@@ -235,6 +244,14 @@ export class Zombie {
     }
 
     if (opts.gib) game.shake(0.05);
+    if (game.netEvents) {
+      game.netEvents.push({
+        k: 'kill',
+        x: Math.round(this.position.x * 100) / 100,
+        z: Math.round(this.position.z * 100) / 100,
+        c: burstColor,
+      });
+    }
     game.registerKill(this);
   }
 

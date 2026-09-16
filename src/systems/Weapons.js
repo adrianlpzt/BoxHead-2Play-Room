@@ -105,6 +105,12 @@ export class WeaponSystem {
     return this.materials.get(color);
   }
 
+  /** Igual que #material, pero pública: la usa GuestSession para pintar balas
+   *  fantasma sin duplicar materiales ni mutar uno compartido por accidente. */
+  colorMaterial(color) {
+    return this.#material(color);
+  }
+
   #take() {
     const b = this.bullets[this.cursor];
     this.cursor = (this.cursor + 1) % this.bullets.length;
@@ -153,6 +159,12 @@ export class WeaponSystem {
     this.muzzle.intensity = w.pellets > 1 ? 28 : 14;
     this.muzzleTimer = 0.06;
     game.shake(w.shake);
+    if (game.netEvents) {
+      game.netEvents.push({
+        k: 'shot', w: weaponId,
+        x: Math.round(origin.x * 100) / 100, z: Math.round(origin.z * 100) / 100,
+      });
+    }
     return true;
   }
 

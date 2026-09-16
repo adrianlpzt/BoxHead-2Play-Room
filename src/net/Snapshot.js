@@ -30,6 +30,10 @@ export function packSnapshot(game) {
     essence: Math.round(game.essence),
     night: game.night,
     state: game.state,
+    // Progresión: sin esto el guest se queda congelado con solo la pistola.
+    unlocked: [...game.unlocked],
+    upgraded: [...game.upgraded],
+    spells: [...game.unlockedSpells],
     // Jugador 1 (host).
     p1: packPlayer(p1),
     // Jugador 2 (guest), si existe.
@@ -41,8 +45,27 @@ export function packSnapshot(game) {
     tu: game.turrets.map(packTurret),
     pk: game.pickups.map(packPickup),
     co: game.corpses.map(packCorpse),
+    // Balas activas del pool (solo visuales para el guest, ver packBullets).
+    bl: packBullets(game.weapons),
+    // Eventos desde el último snapshot: disparos, impactos, muertes — lo que
+    // dispara sonido/partículas/sangre en el guest (que no simula el daño).
+    ev: game.netEvents ? game.netEvents.splice(0) : [],
   };
   return snap;
+}
+
+/** Balas visibles del pool compartido: posición, ángulo y color del tracer. */
+function packBullets(weapons) {
+  const out = [];
+  for (const b of weapons.bullets) {
+    if (b.life > 0) {
+      out.push({
+        x: R2(b.mesh.position.x), z: R2(b.mesh.position.z),
+        r: R1(b.mesh.rotation.y), c: b.mesh.material.color.getHex(),
+      });
+    }
+  }
+  return out;
 }
 
 function packPlayer(p) {

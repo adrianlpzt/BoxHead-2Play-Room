@@ -474,3 +474,39 @@ un código de sala. Cero lógica de juego todavía.**
   mayoría de conexiones — quizá no haga falta.
 - **Reconexión**: si el WebRTC se cae, no hay intento de reconectar.
 - **Más de 2 jugadores**: la señalización ya solo acepta 1 host + 1 guest.
+
+---
+
+## Fix: el guest no veía nada (tiros, sangre, cambio de arma)
+
+Tres huecos concretos en la Fase B/C, confirmados leyendo el código (no a ojo):
+
+1. **Tiros invisibles**: el snapshot nunca incluía las balas del
+   `WeaponSystem`. Añadido `packBullets()` en `Snapshot.js` — posición,
+   ángulo y color de cada bala visible del pool. `GuestSession.#syncBullets`
+   repinta el pool local del guest (que nunca dispara realmente, así que
+   está libre para usarlo como superficie de dibujo).
+   - **Bug al pasar**: mutar `mesh.material.color` directamente teñía TODAS
+     las balas visibles del mismo color a la vez, porque `WeaponSystem`
+     cachea un material por color compartido entre balas. Arreglado
+     asignando el material del caché (`weapons.colorMaterial()`, nuevo
+     método público) en vez de mutar uno existente.
+2. **No cambia de arma**: `game.unlocked` nunca se sincronizaba — el guest
+   se quedaba con `{pistol}` para siempre aunque el host tuviera todo el
+   arsenal. Añadido `unlocked`/`upgraded`/`spells` al snapshot.
+3. **Sin sangre ni partículas**: los zombis fantasma del guest reciben su
+   vida por asignación directa, nunca pasan por `takeDamage()` — que es lo
+   único que dispara decals/partículas. Solución: cola de eventos
+   (`game.netEvents`, solo host) que `Zombie.takeDamage/die` y
+   `Weapons.fire` alimentan (`shot`/`hit`/`shatter`/`kill`), viaja en
+   `snap.ev`, y `GuestSession.#applyEvent` reproduce el efecto local
+   correspondiente (partículas, decal de sangre, sonido, fogonazo).
+
+### Gap conocido, sin arreglar todavía
+El input del guest manda "disparo mantenido" sin distinguir tap de hold
+(`packInput`). Para armas automáticas (uzi) es correcto; para las no
+automáticas (pistola, escopeta, cohete) significa que mantener el clic las
+dispara en ráfaga en vez de un solo tiro por clic — el guest las siente más
+potentes de lo que deberían. Arreglo: mandar un flag de "tap" además del de
+"hold", replicando la distinción `fireTapped`/`fireDown` que ya existe en
+`Input.js` para el jugador local.

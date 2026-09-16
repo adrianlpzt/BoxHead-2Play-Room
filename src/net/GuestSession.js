@@ -80,6 +80,11 @@ export class GuestSession {
     this.game.essence = snap.essence;
     if (this.game.waves) this.game.waves.wave = snap.wave;
 
+    // Progresión: sin esto el guest se queda con solo la pistola para siempre.
+    if (snap.unlocked) this.game.unlocked = new Set(snap.unlocked);
+    if (snap.upgraded) this.game.upgraded = new Set(snap.upgraded);
+    if (snap.spells) this.game.unlockedSpells = new Set(snap.spells);
+
     // Player del host (el "otro" jugador visto por el guest).
     if (snap.p1) {
       this.hostPlayer.position.set(snap.p1.x, 0, snap.p1.z);
@@ -113,6 +118,58 @@ export class GuestSession {
     this.#syncList('turrets', snap.tu, this.#createTurret.bind(this), this.#updateTurret.bind(this));
     this.#syncList('pickups', snap.pk, this.#createPickup.bind(this), this.#updatePickup.bind(this));
     this.#syncList('corpses', snap.co, this.#createCorpse.bind(this), this.#updateCorpse.bind(this));
+
+    // Balas activas: reutilizamos el pool local de WeaponSystem SOLO como
+    // superficie de dibujo — el guest nunca llama a weapons.fire(), así que
+    // este pool está siempre libre para que lo pisemos con lo que diga el host.
+    this.#syncBullets(snap.bl || []);
+
+    // Eventos desde el último snapshot: dispara sonido/partículas/sangre local
+    // para todo lo que el guest no simula (no pasa por takeDamage/fire reales).
+    for (const e of snap.ev || []) this.#applyEvent(e);
+  }
+
+  #syncBullets(list) {
+    const pool = this.game.weapons.bullets;
+    const n = Math.min(list.length, pool.length);
+    for (let i = 0; i < n; i++) {
+      const b = list[i];
+      const mesh = pool[i].mesh;
+      mesh.position.set(b.x, 1.15, b.z);
+      mesh.rotation.set(0, b.r, 0);
+      // Material por color desde el caché compartido — mutar `.color` en un
+      // material que otras balas también referencian teñiría a todas a la vez.
+      mesh.material = this.game.weapons.colorMaterial(b.c);
+      mesh.visible = true;
+    }
+    // Oculta el resto del pool: balas que ya no existen en este snapshot.
+    for (let i = n; i < pool.length; i++) pool[i].mesh.visible = false;
+  }
+
+  /** Reproduce localmente el efecto visual/sonoro de algo que pasó en el host. */
+  #applyEvent(e) {
+    const g = this.game;
+    const pos = new THREE.Vector3(e.x, e.k === 'shot' ? 1.1 : 1.2, e.z);
+    switch (e.k) {
+      case 'shot':
+        g.audio.shot(e.w);
+        g.flashLight(pos, 0xffd070, 10, 0.05);
+        break;
+      case 'hit':
+        g.particles.burst(pos, e.c, 3, { power: 5, size: 0.15, ttl: 0.6 });
+        g.decals.blood(new THREE.Vector3(e.x, 0, e.z), 0.5, e.b);
+        g.audio.hit();
+        break;
+      case 'shatter':
+        g.particles.burst(pos, 0xbfeaf5, 8, { power: 7, size: 0.17, ttl: 0.6 });
+        g.audio.shatter();
+        break;
+      case 'kill':
+        g.particles.burst(pos, e.c, 12, { power: 9, size: 0.2 });
+        g.decals.blood(new THREE.Vector3(e.x, 0, e.z), 1.5, e.c);
+        g.audio.gib();
+        break;
+    }
   }
 
   /**
