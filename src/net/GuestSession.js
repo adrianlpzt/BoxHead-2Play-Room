@@ -191,6 +191,16 @@ export class GuestSession {
         }
         break;
       }
+      case 'crate': {
+        // Rompe la MISMA caja localmente (por índice) para que sus cubos caigan
+        // con física. fromNet=true evita re-emitir el evento.
+        const crate = g.arena.crates.find((c) => c._idx === e.idx);
+        if (crate && crate.alive) {
+          const dir = new THREE.Vector3(e.dx, 0, e.dz);
+          crate.damage(e.dmg, g, dir, true);
+        }
+        break;
+      }
     }
   }
 

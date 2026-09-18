@@ -73,7 +73,7 @@ class Crate {
     game.particles.burst(v.position, this.color, 5, { power: 6, size: 0.14, ttl: 0.6 });
   }
 
-  damage(amount, game, impactDir = null) {
+  damage(amount, game, impactDir = null, fromNet = false) {
     if (!this.alive) return;
     this.hp -= amount;
 
@@ -81,6 +81,16 @@ class Crate {
     const wanted = Math.max(0, Math.ceil((this.hp / this.maxHp) * this.voxels.length));
     let guard = 0;
     while (this.stack.length > wanted && guard++ < 12) this.#popVoxel(game, impactDir);
+
+    // El host avisa al guest para que rompa la MISMA caja (por índice) y suelte
+    // los cubos con física local. fromNet evita el bucle en el guest.
+    if (!fromNet && game.netEvents && this._idx != null) {
+      game.netEvents.push({
+        k: 'crate', idx: this._idx, dmg: Math.round(amount),
+        dx: impactDir ? Math.round(impactDir.x * 10) / 10 : 0,
+        dz: impactDir ? Math.round(impactDir.z * 10) / 10 : 0,
+      });
+    }
 
     if (this.hp <= 0) this.destroy(game);
   }
@@ -193,6 +203,7 @@ export class Arena {
   #buildCrates() {
     for (const [x, z, sx, sz] of this.map.crates) {
       const crate = new Crate(this.group, x, z, sx, sz, 2, 0x7a6a4f);
+      crate._idx = this.crates.length; // índice estable para sincronización de red
       this.crates.push(crate);
       this.walls.push(crate.box);
     }

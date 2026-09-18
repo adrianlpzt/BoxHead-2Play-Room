@@ -20,8 +20,8 @@ export const WEAPON_IDX = {
 };
 export const IDX_WEAPON = Object.keys(WEAPON_IDX);
 
-const EV = { shot: 0, hit: 1, shatter: 2, kill: 3 };
-const EV_NAME = ['shot', 'hit', 'shatter', 'kill'];
+const EV = { shot: 0, hit: 1, shatter: 2, kill: 3, crate: 4 };
+const EV_NAME = ['shot', 'hit', 'shatter', 'kill', 'crate'];
 
 const PK_TYPES = ['shotgun', 'uzi', 'barrel', 'mine', 'barricade', 'turret', 'grenade', 'rocket', 'essence', 'health'];
 const PK_IDX = Object.fromEntries(PK_TYPES.map((k, i) => [k, i]));
@@ -100,6 +100,7 @@ function packBullets(weapons) {
 function packEvent(e) {
   if (e.k === 'shot') return [EV.shot, R2(e.x), R2(e.z), WEAPON_IDX[e.w] ?? 0];
   if (e.k === 'kill') return [EV.kill, e.id];
+  if (e.k === 'crate') return [EV.crate, e.idx, e.dmg, e.dx, e.dz];
   return [EV[e.k], R2(e.x), R2(e.z), e.c, e.b];
 }
 
@@ -160,6 +161,7 @@ function unpackEvent(a) {
   const k = EV_NAME[a[0]];
   if (k === 'shot') return { k, x: a[1], z: a[2], w: IDX_WEAPON[a[3]] };
   if (k === 'kill') return { k, id: a[1] };
+  if (k === 'crate') return { k, idx: a[1], dmg: a[2], dx: a[3], dz: a[4] };
   return { k, x: a[1], z: a[2], c: a[3], b: a[4] };
 }
 

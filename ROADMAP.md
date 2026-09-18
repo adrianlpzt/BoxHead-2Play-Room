@@ -633,3 +633,26 @@ Dos bugs reportados:
 - Estela de bala en el guest (se pinta por snapshot, no se simula).
 - Predicción de disparo del guest, reconexión, colocables del guest.
 - Aviso visual de "esperando al compañero" cuando uno muere y el otro sigue.
+
+---
+
+## Online: cajas destructibles en el guest + sincronización de mapa
+
+- [x] **Cubos de las cajas cayendo en el guest.** Antes el guest veía la caja
+  encogerse pero no los cubos volar. Ahora: cada caja del mapa tiene un `_idx`
+  estable; cuando el host la daña emite un evento `crate` (idx + daño + dir);
+  el guest aplica ese `damage(..., fromNet=true)` a SU caja del mismo índice,
+  que suelta los cubos con física local. Mismo patrón que el desmembramiento
+  de zombis. (Las barricadas colocadas por el jugador siguen sin sincronizar
+  su rotura — caso menos común, pendiente.)
+- [x] **Sincronización de mapa host→guest.** Bug latente: el host elegía mapa
+  pero el guest usaba el suyo local; si diferían, cajas y escenario no
+  coincidían. Ahora el host manda su `map` en el `hello`, y el guest lo adopta
+  antes de arrancar. Además el guest ahora ESPERA el hello del host (con red de
+  seguridad de 2s) en vez de un timeout fijo, para tener el mapa correcto antes
+  de construir su arena.
+
+### Estado del online tras validación del usuario
+Confirmado funcionando por el usuario: piernas animadas, desmembramiento de
+zombis, muerte (deja de disparar/moverse), zombis persiguen al vivo. Esta
+pasada añade los cubos de cajas y la sincronización de mapa.

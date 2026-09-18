@@ -164,7 +164,7 @@ export class Menu {
         };
         this.net.onConnected = () => {
           status.textContent = '¡Conectado! Arrancando partida…';
-          this.net.send({ type: 'hello', name: localStorage.getItem('boxhead3d.name') || 'HOST' });
+          this.net.send({ type: 'hello', name: localStorage.getItem('boxhead3d.name') || 'HOST', map: this.mapId });
           // Arranca la partida como host.
           setTimeout(() => {
             this.hide();
@@ -187,16 +187,26 @@ export class Menu {
       if (code.length !== 4) { status.textContent = 'Introduce un código de 4 caracteres.'; return; }
       status.textContent = `Uniéndose a ${code}…`;
       try {
+        let started = false;
+        const startAsGuest = () => {
+          if (started) return;
+          started = true;
+          this.hide();
+          this.onPlayMulti('guest', this.mapId);
+        };
         this.net.onConnected = () => {
-          status.textContent = '¡Conectado! Arrancando partida…';
+          status.textContent = '¡Conectado! Sincronizando…';
           this.net.send({ type: 'hello', name: localStorage.getItem('boxhead3d.name') || 'GUEST' });
-          setTimeout(() => {
-            this.hide();
-            this.onPlayMulti('guest', this.mapId);
-          }, 500);
+          // Red de seguridad: si el hello del host no llega en 2s, arranca igual.
+          setTimeout(startAsGuest, 2000);
         };
         this.net.onData = (msg) => {
-          if (msg.type === 'hello') status.textContent = `¡${msg.name} conectado!`;
+          if (msg.type === 'hello') {
+            status.textContent = `¡${msg.name} conectado!`;
+            // Usa el mapa del host para que cajas y escenario coincidan, y arranca.
+            if (msg.map && MAP_ORDER.includes(msg.map)) this.mapId = msg.map;
+            startAsGuest();
+          }
         };
         this.net.onError = (msg) => { status.textContent = `Error: ${msg}`; };
         this.net.onDisconnected = (reason) => { status.textContent = `Desconectado: ${reason}`; };
