@@ -49,7 +49,6 @@ export function packSnapshot(game) {
     pk: game.pickups.map(packPickup),
     co: game.corpses.map(packCorpse),
     bl: packBullets(game.weapons),
-    ev: game.netEvents ? game.netEvents.splice(0).map(packEvent) : [],
     un: [...game.unlocked].map((w) => WEAPON_IDX[w] ?? -1).filter((i) => i >= 0),
     up: [...game.upgraded].map((w) => WEAPON_IDX[w] ?? -1).filter((i) => i >= 0),
     sp: [...game.unlockedSpells],
@@ -100,8 +99,18 @@ function packBullets(weapons) {
 }
 function packEvent(e) {
   if (e.k === 'shot') return [EV.shot, R2(e.x), R2(e.z), WEAPON_IDX[e.w] ?? 0];
-  if (e.k === 'kill') return [EV.kill, R2(e.x), R2(e.z), e.c];
+  if (e.k === 'kill') return [EV.kill, e.id];
   return [EV[e.k], R2(e.x), R2(e.z), e.c, e.b];
+}
+
+/** Empaqueta una lista de eventos para el canal de eventos (mensaje aparte). */
+export function packEvents(list) {
+  return list.map(packEvent);
+}
+
+/** Desempaqueta la lista de eventos recibida en su propio mensaje. */
+export function unpackEvents(list) {
+  return list.map(unpackEvent);
 }
 
 export function unpackSnapshot(snap) {
@@ -117,7 +126,6 @@ export function unpackSnapshot(snap) {
     pickups: snap.pk.map(unpackPickup),
     corpses: snap.co.map(unpackCorpse),
     bullets: snap.bl.map(unpackBullet),
-    events: snap.ev.map(unpackEvent),
     unlocked: (snap.un || []).map((i) => IDX_WEAPON[i]).filter(Boolean),
     upgraded: (snap.up || []).map((i) => IDX_WEAPON[i]).filter(Boolean),
     spells: snap.sp || [],
@@ -151,7 +159,7 @@ function unpackBullet(a) {
 function unpackEvent(a) {
   const k = EV_NAME[a[0]];
   if (k === 'shot') return { k, x: a[1], z: a[2], w: IDX_WEAPON[a[3]] };
-  if (k === 'kill') return { k, x: a[1], z: a[2], c: a[3] };
+  if (k === 'kill') return { k, id: a[1] };
   return { k, x: a[1], z: a[2], c: a[3], b: a[4] };
 }
 

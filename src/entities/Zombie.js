@@ -244,13 +244,13 @@ export class Zombie {
     }
 
     if (opts.gib) game.shake(0.05);
+    if (opts.fromNet) return; // en el guest die() es solo visual
+    // El kill viaja como EVENTO (canal aparte, cada frame) en vez de depender del
+    // flag `dead` de un snapshot que puede perderse o no llegar (el host barre el
+    // zombi el mismo frame). Lleva el id para que el guest dispare el die() del
+    // ghost correcto.
     if (game.netEvents) {
-      game.netEvents.push({
-        k: 'kill',
-        x: Math.round(this.position.x * 100) / 100,
-        z: Math.round(this.position.z * 100) / 100,
-        c: burstColor,
-      });
+      game.netEvents.push({ k: 'kill', id: this._netId });
     }
     game.registerKill(this);
   }

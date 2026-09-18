@@ -5,7 +5,7 @@ import { Mine } from '../entities/Mine.js';
 import { Turret } from '../entities/Turret.js';
 import { Pickup } from '../entities/Pickup.js';
 import { BomberCorpse } from '../entities/Zombie.js';
-import { packInput, unpackSnapshot } from './Snapshot.js';
+import { packInput, unpackSnapshot, unpackEvents } from './Snapshot.js';
 import { lerp } from '../core/Collision.js';
 
 /** Interpola ángulos por el camino más corto (evita el giro de 360°). */
@@ -50,8 +50,14 @@ export class GuestSession {
     // Escucha snapshots del host (formato compacto: {s:1, ...}).
     net.onData = (msg) => {
       if (msg && msg.s === 1) this.#onSnapshot(unpackSnapshot(msg));
+      else if (msg && msg.e === 1) this.#onEvents(unpackEvents(msg.ev));
       else if (msg && msg.go === 1) this.#onGameOver(msg);
     };
+  }
+
+  /** Eventos recibidos en su propio mensaje (disparos, golpes, muertes). */
+  #onEvents(events) {
+    for (const e of events) this.#applyEvent(e);
   }
 
   #onGameOver(msg) {
@@ -138,10 +144,6 @@ export class GuestSession {
     // superficie de dibujo — el guest nunca llama a weapons.fire(), así que
     // este pool está siempre libre para que lo pisemos con lo que diga el host.
     this.#syncBullets(snap.bullets || []);
-
-    // Eventos desde el último snapshot: dispara sonido/partículas/sangre local
-    // para todo lo que el guest no simula (no pasa por takeDamage/fire reales).
-    for (const e of snap.events || []) this.#applyEvent(e);
   }
 
   #syncBullets(list) {
@@ -179,11 +181,16 @@ export class GuestSession {
         g.particles.burst(pos, 0xbfeaf5, 8, { power: 7, size: 0.17, ttl: 0.6 });
         g.audio.shatter();
         break;
-      case 'kill':
-        g.particles.burst(pos, e.c, 12, { power: 9, size: 0.2 });
-        g.decals.blood(new THREE.Vector3(e.x, 0, e.z), 1.5, e.c);
-        g.audio.gib();
+      case 'kill': {
+        // Dispara el desmembramiento REAL del ghost correspondiente (cubos con
+        // física), no una nubecita genérica. Viene por evento fiable con el id.
+        const ghost = this.ghosts.zombies.get(e.id);
+        if (ghost && !ghost.dead) {
+          try { ghost.die(g, null, { fromNet: true }); }
+          catch { ghost.dead = true; if (ghost.group) ghost.group.visible = false; }
+        }
         break;
+      }
     }
   }
 
@@ -236,9 +243,12 @@ export class GuestSession {
         if (p.userData && p.userData.base) p.material = p.userData.base;
       }
     }
+    // La muerte/desmembramiento la dispara el evento 'kill' (canal fiable con id),
+    // no el flag del snapshot. Aquí solo ocultamos por si el evento se perdió y
+    // el zombi sigue marcado como muerto varios snapshots.
     if (data.dead && !ghost.dead) {
       ghost.dead = true;
-      ghost.group.visible = false;
+      if (ghost.group) ghost.group.visible = false;
     }
   }
 

@@ -573,3 +573,32 @@ porque no puedo probar dos navegadores conectados desde aquí.
 - Reconexión / migración de host.
 - El guest no puede colocar (barril/mina/torreta/barricada) ni lanzar granadas.
 - Aviso visual de "esperando al compañero" cuando uno muere y el otro sigue.
+
+---
+
+## Online: canal de eventos separado + desmembramiento real en el guest
+
+Problema reportado: en el guest, disparos y desmembramientos no se ven fluidos.
+Causa (dos cosas distintas, arregladas distinto):
+
+1. **Movimiento**: tasa de snapshots subida 15Hz → **22Hz** (movimiento de
+   zombis más fino). A 5,4KB/snapshot × 22 ≈ 120KB/s, holgado.
+2. **Eventos (disparos/muertes) NO son un problema de tasa — son instantes.**
+   Antes viajaban DENTRO del snapshot; si ese snapshot se perdía (DataChannel
+   unreliable, sin reintentos), el evento se perdía para siempre. Ahora los
+   eventos van en su **propio mensaje cada frame** (`{e:1, ev:[...]}`, ~30
+   bytes/evento), independiente del snapshot — un disparo o una muerte ya no
+   esperan ni dependen del snapshot.
+3. **Desmembramiento real en el guest**: antes el evento `kill` pintaba una
+   nubecita genérica de partículas. Ahora el evento `kill` lleva el `id` del
+   zombi y dispara el `die()` REAL de su ghost (que es un objeto Zombie
+   completo) con flag `fromNet` — genera los cubos con física (cabeza, brazos,
+   torso volando) igual que en el host, sin tocar puntería/munición/puntos
+   (autoridad del host). Verificado el roundtrip de eventos.
+
+### Límite honesto que queda
+La ESTELA de la bala en vuelo sigue menos fluida que en el host: el guest pinta
+las balas en las posiciones del snapshot (22Hz), no las simula. El fogonazo y
+el sonido de cada disparo ahora sí llegan siempre (evento). Simular las balas
+localmente desde el evento de disparo (como el host) las haría perfectas —
+pendiente si molesta.

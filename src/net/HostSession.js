@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { Player } from '../entities/Player.js';
-import { packSnapshot, unpackInput } from './Snapshot.js';
+import { packSnapshot, unpackInput, packEvents } from './Snapshot.js';
 
-const SNAPSHOT_INTERVAL = 1 / 15; // 15 snapshots/s
+const SNAPSHOT_INTERVAL = 1 / 22; // 22 snapshots/s (movimiento más fino)
 
 /**
  * Sesión del host: es quien simula el mundo. El guest solo pinta lo que
@@ -64,11 +64,17 @@ export class HostSession {
     }
 
     this.timer += dt;
-    if (this.timer >= SNAPSHOT_INTERVAL && this.net.connected) {
+    if (this.timer >= SNAPSHOT_INTERVAL && this.net.connected && this.net.canSend()) {
       this.timer = 0;
-      // No enviar si el buffer del canal está saturado (evita encolar y perder).
-      if (!this.net.canSend()) return;
       this.net.send(packSnapshot(this.game));
+    }
+
+    // Eventos (disparos, golpes, muertes): se mandan CADA frame en su propio
+    // mensaje, no dentro del snapshot. Así un evento no espera al próximo
+    // snapshot ni se pierde si ese snapshot se pierde — cada uno es ~30 bytes.
+    const ev = this.game.netEvents;
+    if (ev.length && this.net.connected && this.net.canSend()) {
+      this.net.send({ e: 1, ev: packEvents(ev.splice(0)) });
     }
   }
 
