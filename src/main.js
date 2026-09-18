@@ -132,13 +132,25 @@ const menu = new Menu(ranking, net, {
       netSession = new HostSession(game, net, scene);
     } else {
       netSession = new GuestSession(game, net, scene, input);
+      // El host avisa cuando la partida termina (ambos muertos).
+      netSession.onGameOver_ = (msg) => {
+        game.state = 'over';
+        game.score = msg.score;
+        game.waves.wave = msg.wave;
+        const rank = ranking.qualifies(msg.score)
+          ? ranking.add(pendingName, msg.score, msg.wave)
+          : -1;
+        hud.showGameOver(game, rank, ranking.best);
+      };
     }
   },
 });
 
 // Botones de la pantalla de fin de partida.
 document.getElementById('btn-retry').onclick = () => {
-  if (game.state === 'over') resetGame();
+  if (game.state !== 'over') return;
+  if (netSession) returnToMenu(); // en multi no se reinicia en sitio: al menú
+  else resetGame();
 };
 document.getElementById('btn-menu').onclick = () => {
   if (game.state === 'over') returnToMenu();
@@ -258,13 +270,22 @@ const game = {
   },
 
   onPlayerDeath() {
+    // En co-op, la partida sigue mientras uno de los dos siga vivo (estilo L4D).
+    // Solo terminamos cuando ambos han caído.
+    if (this.player2) {
+      const bothDead = this.player.dead && this.player2.dead;
+      if (!bothDead) return; // el otro sigue en pie: la partida continúa
+    }
     this.state = 'over';
     this.shake(0.8);
-    // Registra la puntuación en el ranking local antes de mostrar el game over.
     const rank = ranking.qualifies(this.score)
       ? ranking.add(pendingName, this.score, this.waves.wave)
       : -1;
     hud.showGameOver(this, rank, ranking.best);
+    // En multi, avisar al peer de que la partida acabó.
+    if (netSession && net.connected) {
+      net.send({ go: 1, score: this.score, wave: this.waves.wave });
+    }
   },
 };
 
@@ -689,7 +710,10 @@ function tick() {
   if (game.state === 'menu') {
     // Solo se renderiza el fondo; el menú es DOM y gestiona sus clics.
   } else if (game.state === 'over') {
-    if (input.tapped('KeyR')) resetGame();
+    if (input.tapped('KeyR')) {
+      if (netSession) returnToMenu();
+      else resetGame();
+    }
   } else if (dt > 0) {
     game.crowded = game.zombies.length > 60;
     updateAim();

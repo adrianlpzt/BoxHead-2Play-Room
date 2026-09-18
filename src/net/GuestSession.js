@@ -8,6 +8,14 @@ import { BomberCorpse } from '../entities/Zombie.js';
 import { packInput, unpackSnapshot } from './Snapshot.js';
 import { lerp } from '../core/Collision.js';
 
+/** Interpola ángulos por el camino más corto (evita el giro de 360°). */
+function lerpAngle(a, b, t) {
+  let diff = b - a;
+  while (diff > Math.PI) diff -= Math.PI * 2;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  return a + diff * t;
+}
+
 /**
  * Sesión del guest: NO simula el mundo. Recibe snapshots del host y mueve/
  * crea/destruye las entidades visuales para que coincidan con el estado del
@@ -42,7 +50,12 @@ export class GuestSession {
     // Escucha snapshots del host (formato compacto: {s:1, ...}).
     net.onData = (msg) => {
       if (msg && msg.s === 1) this.#onSnapshot(unpackSnapshot(msg));
+      else if (msg && msg.go === 1) this.#onGameOver(msg);
     };
+  }
+
+  #onGameOver(msg) {
+    if (this.onGameOver_) this.onGameOver_(msg);
   }
 
   #createGhostPlayer() {
@@ -66,6 +79,7 @@ export class GuestSession {
     const gun = box(0.2, 0.2, 0.85, 0x23262c);
     gun.position.set(0.62, 1.15, 0.55);
     p.add(torso, head, hair, gun);
+    p._tx = 0; p._tz = 0; p._tr = 0;
     this.scene.add(p);
     return p;
   }
@@ -85,10 +99,11 @@ export class GuestSession {
     if (snap.upgraded) this.game.upgraded = new Set(snap.upgraded);
     if (snap.spells) this.game.unlockedSpells = new Set(snap.spells);
 
-    // Player del host (el "otro" jugador visto por el guest).
+    // Player del host (el "otro" jugador visto por el guest). Guarda objetivo.
     if (snap.p1) {
-      this.hostPlayer.position.set(snap.p1.x, 0, snap.p1.z);
-      this.hostPlayer.rotation.y = snap.p1.r;
+      this.hostPlayer._tx = snap.p1.x;
+      this.hostPlayer._tz = snap.p1.z;
+      this.hostPlayer._tr = snap.p1.r;
       this.hostPlayer.visible = !snap.p1.dead;
     }
 
@@ -205,12 +220,14 @@ export class GuestSession {
 
   #createZombie(data) {
     const pos = new THREE.Vector3(data.x, 0, data.z);
-    return new Zombie(this.scene, data.type, pos);
+    const z = new Zombie(this.scene, data.type, pos);
+    z._tx = data.x; z._tz = data.z; z._tr = data.r;
+    return z;
   }
   #updateZombie(ghost, data) {
-    ghost.position.x = lerp(ghost.position.x, data.x, 0.25);
-    ghost.position.z = lerp(ghost.position.z, data.z, 0.25);
-    ghost.group.rotation.y = data.r;
+    // Guarda la posición/rotación OBJETIVO; la interpolación real ocurre cada
+    // frame en #interpolate, no aquí (que solo corre 15 veces/s).
+    ghost._tx = data.x; ghost._tz = data.z; ghost._tr = data.r;
     ghost.hp = data.hp;
     if (data.fr && !ghost.frozen) ghost.freeze(99);
     if (!data.fr && ghost.frozen) {
@@ -226,11 +243,12 @@ export class GuestSession {
   }
 
   #createBarrel(data) {
-    return new Barrel(this.scene, new THREE.Vector3(data.x, 0, data.z));
+    const b = new Barrel(this.scene, new THREE.Vector3(data.x, 0, data.z));
+    b._tx = data.x; b._tz = data.z;
+    return b;
   }
   #updateBarrel(ghost, data) {
-    ghost.position.x = lerp(ghost.position.x, data.x, 0.25);
-    ghost.position.z = lerp(ghost.position.z, data.z, 0.25);
+    ghost._tx = data.x; ghost._tz = data.z;
     ghost.hp = data.hp;
     if (data.fuse && ghost.fuse < 0) ghost.prime(0.5);
   }
@@ -280,11 +298,37 @@ export class GuestSession {
   }
 
   /**
-   * Se llama cada frame desde main.js. Envía los inputs del guest al host.
-   * El guest sigue moviendo su Player localmente (predicción) pero la verdad
-   * viene del snapshot.
+   * Interpolación por frame (60fps) hacia las posiciones objetivo del último
+   * snapshot (15Hz). Sin esto, los ghosts solo se mueven 15 veces/s y se ven a
+   * tirones. El factor es exponencial y dependiente de dt para ser fluido a
+   * cualquier framerate.
+   */
+  #interpolate(dt) {
+    const k = 1 - Math.pow(0.001, dt); // ~suave; a 60fps ≈ 0.11 por frame
+    for (const map of Object.values(this.ghosts)) {
+      for (const ghost of map.values()) {
+        if (ghost._tx == null) continue;
+        ghost.position.x = lerp(ghost.position.x, ghost._tx, k);
+        ghost.position.z = lerp(ghost.position.z, ghost._tz, k);
+        if (ghost._tr != null && ghost.group) {
+          ghost.group.rotation.y = lerpAngle(ghost.group.rotation.y, ghost._tr, k);
+        }
+      }
+    }
+    // Avatar del host.
+    const hp = this.hostPlayer;
+    if (hp._tx != null) {
+      hp.position.x = lerp(hp.position.x, hp._tx, k);
+      hp.position.z = lerp(hp.position.z, hp._tz, k);
+      hp.rotation.y = lerpAngle(hp.rotation.y, hp._tr, k);
+    }
+  }
+
+  /**
+   * Se llama cada frame desde main.js. Interpola los ghosts y envía inputs.
    */
   update(dt) {
+    this.#interpolate(dt);
     if (!this.net.connected) return;
 
     const inp = this.input;

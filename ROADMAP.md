@@ -546,3 +546,30 @@ los campos sobreviven el viaje intactos.
 ### Estado del online tras este fix
 Debería verse el mundo completo en el guest. Pendiente de confirmar jugando,
 porque no puedo probar dos navegadores conectados desde aquí.
+
+---
+
+## Online: interpolación fluida + game over propagado
+
+- [x] **Lag/tirones arreglados.** Causa: el guest recibía snapshots a 15Hz pero
+  solo movía los ghosts en el momento del snapshot (lerp de un solo paso), así
+  que entre snapshots (67ms) todo se congelaba y luego saltaba. Solución:
+  `#updateZombie`/`#updateBarrel` ahora solo guardan la posición OBJETIVO
+  (`_tx/_tz/_tr`), y un nuevo `#interpolate(dt)` corre CADA frame (60fps)
+  moviendo todos los ghosts suavemente hacia su objetivo con un factor
+  exponencial dependiente de dt. Rotaciones con `lerpAngle` (camino corto).
+  El avatar del host también interpola.
+- [x] **Game over propagado.** Antes, cuando uno moría, el otro se quedaba
+  congelado sin pantalla de fin. Ahora:
+  - En co-op la partida SIGUE mientras uno de los dos viva (estilo L4D):
+    `onPlayerDeath` solo termina si `player.dead && player2.dead`.
+  - Cuando ambos caen, el host manda `{go:1, score, wave}` al guest, que
+    muestra su propia pantalla de game over con la puntuación final.
+  - En multi, Reintentar y `R` vuelven al MENÚ (no reinician en sitio, que
+    descoordinaría host y guest).
+
+### Pendiente del online (sin cambios)
+- Predicción de disparo del guest (latencia en su propia arma).
+- Reconexión / migración de host.
+- El guest no puede colocar (barril/mina/torreta/barricada) ni lanzar granadas.
+- Aviso visual de "esperando al compañero" cuando uno muere y el otro sigue.
