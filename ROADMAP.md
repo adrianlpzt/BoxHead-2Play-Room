@@ -656,3 +656,19 @@ Dos bugs reportados:
 Confirmado funcionando por el usuario: piernas animadas, desmembramiento de
 zombis, muerte (deja de disparar/moverse), zombis persiguen al vivo. Esta
 pasada añade los cubos de cajas y la sincronización de mapa.
+
+---
+
+## Eliminadas las cajas destructibles del mapa
+
+Decisión de diseño del usuario: las cajas destructibles del mapa no aportaban a
+la partida (cobertura que solo estorbaba disparos y movimiento, sin dar nada a
+cambio), y además complicaban la sincronización online. Eliminadas:
+- `crates: []` vacío en los tres mapas (`Maps.js`).
+- En "La Caja", las 4 cajas se sustituyeron por PILARES indestructibles en las
+  mismas posiciones — mantiene la estructura de cobertura sin el consumo de
+  recurso. Templo y Reactor ya tenían pilares de sobra.
+- La clase `Crate`, `damageCrates`, el evento `crate` de red y `w.crate` se
+  CONSERVAN: siguen sirviendo a las **barricadas** (arma colocable que sí aporta,
+  el jugador las pone estratégicamente). De hecho las barricadas del guest ahora
+  sincronizan su rotura gracias al evento `crate` que se añadió para las cajas.

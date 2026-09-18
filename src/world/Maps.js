@@ -1,9 +1,10 @@
 /**
  * Definiciones de mapas. Cada una describe la paleta del suelo y la disposición
- * de pilares (indestructibles) y cajas (destructibles). La Arena las consume;
- * añadir un mapa nuevo es añadir una entrada aquí, sin tocar la lógica.
+ * de pilares (indestructibles). La Arena las consume; añadir un mapa nuevo es
+ * añadir una entrada aquí, sin tocar la lógica.
  *
- * Formato de pilar/caja: [x, z, anchoX, anchoZ]. Los pilares además llevan color.
+ * Formato de pilar: [x, z, anchoX, anchoZ]. Los pilares llevan color aparte.
+ * (Las cajas destructibles se eliminaron: estorbaban sin aportar a la partida.)
  */
 export const MAPS = {
   box: {
@@ -14,13 +15,12 @@ export const MAPS = {
     pillars: [
       [0, -9, 8, 2.5],
       [0, 9, 8, 2.5],
+      [-15, -15, 4, 4],
+      [15, -15, 4, 4],
+      [-15, 15, 4, 4],
+      [15, 15, 4, 4],
     ],
-    crates: [
-      [-14, -14, 5, 5],
-      [14, -14, 5, 5],
-      [-14, 14, 5, 5],
-      [14, 14, 5, 5],
-    ],
+    crates: [],
   },
 
   columns: {
@@ -38,12 +38,7 @@ export const MAPS = {
       }
       return out;
     })(),
-    crates: [
-      [0, -20, 4, 4],
-      [0, 20, 4, 4],
-      [-20, 0, 4, 4],
-      [20, 0, 4, 4],
-    ],
+    crates: [],
   },
 
   reactor: {
@@ -60,12 +55,7 @@ export const MAPS = {
       [-18, 18, 3, 3],
       [18, 18, 3, 3],
     ],
-    crates: [
-      [-12, 0, 3, 6],
-      [12, 0, 3, 6],
-      [0, -14, 6, 3],
-      [0, 14, 6, 3],
-    ],
+    crates: [],
   },
 };
 
