@@ -277,6 +277,16 @@ export class Zombie {
     game.audio.fireball();
   }
 
+  /** Animación procedural de caminar (piernas). Separada de update() para que
+   *  el guest, que no simula IA, pueda animar los ghosts en movimiento. */
+  animate(dt, moving = true) {
+    if (this.dead) return;
+    this.walkPhase += dt * (moving ? this.speed * 2.2 : 0);
+    const sw = Math.sin(this.walkPhase) * 0.5;
+    if (this.parts.legL.visible) this.parts.legL.rotation.x = sw;
+    if (this.parts.legR.visible) this.parts.legR.rotation.x = -sw;
+  }
+
   update(dt, game) {
     if (this.dead) return;
 
@@ -290,12 +300,19 @@ export class Zombie {
       }
     }
 
-    // En multijugador, persigue al jugador más cercano.
-    let target = game.player.position;
-    if (game.player2 && !game.player2.dead) {
-      const d1 = distXZ(this.position, game.player.position);
-      const d2 = distXZ(this.position, game.player2.position);
-      if (d2 < d1) target = game.player2.position;
+    // En multijugador, persigue al jugador VIVO más cercano.
+    const p1 = game.player;
+    const p2 = game.player2;
+    const p1ok = !p1.dead;
+    const p2ok = p2 && !p2.dead;
+    let target;
+    if (p1ok && p2ok) {
+      target = distXZ(this.position, p1.position) <= distXZ(this.position, p2.position)
+        ? p1.position : p2.position;
+    } else if (p2ok) {
+      target = p2.position;
+    } else {
+      target = p1.position; // solo P1 vivo, o ambos muertos (da igual, se acaba)
     }
     const dx = target.x - this.position.x;
     const dz = target.z - this.position.z;
@@ -410,10 +427,7 @@ export class Zombie {
     else if (this.position.z < -lim) this.position.z = -lim;
 
     // --- Animación y estado -------------------------------------------------
-    this.walkPhase += dt * this.speed * 2.2;
-    const sw = Math.sin(this.walkPhase) * 0.5;
-    if (this.parts.legL.visible) this.parts.legL.rotation.x = sw;
-    if (this.parts.legR.visible) this.parts.legR.rotation.x = -sw;
+    this.animate(dt);
 
     this.attackCd -= dt;
     if (this.bleedTimer > 0) this.bleedTimer -= dt;

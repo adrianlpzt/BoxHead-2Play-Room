@@ -315,16 +315,31 @@ export class GuestSession {
    */
   #interpolate(dt) {
     const k = 1 - Math.pow(0.001, dt); // ~suave; a 60fps ≈ 0.11 por frame
-    for (const map of Object.values(this.ghosts)) {
+
+    // Zombis: interpolar posición + animar las piernas si se están moviendo.
+    for (const z of this.ghosts.zombies.values()) {
+      if (z._tx == null) continue;
+      const dx = z._tx - z.position.x;
+      const dz = z._tz - z.position.z;
+      const moving = dx * dx + dz * dz > 0.0004; // umbral pequeño
+      z.position.x = lerp(z.position.x, z._tx, k);
+      z.position.z = lerp(z.position.z, z._tz, k);
+      if (z._tr != null && z.group) {
+        z.group.rotation.y = lerpAngle(z.group.rotation.y, z._tr, k);
+      }
+      if (z.animate) z.animate(dt, moving);
+    }
+
+    // Resto de ghosts (barriles, minas...): solo interpolar posición.
+    for (const [key, map] of Object.entries(this.ghosts)) {
+      if (key === 'zombies') continue;
       for (const ghost of map.values()) {
         if (ghost._tx == null) continue;
         ghost.position.x = lerp(ghost.position.x, ghost._tx, k);
         ghost.position.z = lerp(ghost.position.z, ghost._tz, k);
-        if (ghost._tr != null && ghost.group) {
-          ghost.group.rotation.y = lerpAngle(ghost.group.rotation.y, ghost._tr, k);
-        }
       }
     }
+
     // Avatar del host.
     const hp = this.hostPlayer;
     if (hp._tx != null) {
@@ -342,14 +357,16 @@ export class GuestSession {
     if (!this.net.connected) return;
 
     const inp = this.input;
+    const dead = this.game.player.dead;
     const moveDir = new THREE.Vector3();
-    inp.moveVector(moveDir);
+    if (!dead) inp.moveVector(moveDir);
     const aim = this.game.player.group.rotation.y;
-    const fireDown = inp.fireDown || inp.pressed('Space');
-    const fireTap = inp.fireTapped || inp.tapped('Space');
+    // Muerto: no manda disparo, magia ni dash.
+    const fireDown = !dead && (inp.fireDown || inp.pressed('Space'));
+    const fireTap = !dead && (inp.fireTapped || inp.tapped('Space'));
     const weapon = this.game.weapon;
-    const spell = inp.tapped('KeyQ') ? 'stomp' : inp.tapped('KeyE') ? 'frostnova' : null;
-    const dash = inp.tapped('ShiftLeft') || inp.tapped('ShiftRight');
+    const spell = dead ? null : (inp.tapped('KeyQ') ? 'stomp' : inp.tapped('KeyE') ? 'frostnova' : null);
+    const dash = !dead && (inp.tapped('ShiftLeft') || inp.tapped('ShiftRight'));
 
     const msg = packInput(moveDir.x, moveDir.z, aim, fireDown, weapon, spell, dash, fireTap);
     this.net.send(msg);

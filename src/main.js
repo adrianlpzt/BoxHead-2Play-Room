@@ -722,27 +722,31 @@ function tick() {
     if (isGuest) {
       // --- GUEST: solo mueve su player (predicción local) y envía inputs ---
       // No simula zombis, oleadas, colisiones de balas ni nada del mundo.
-      WEAPON_ORDER.forEach((id, i) => {
-        if (input.tapped(`Digit${i + 1}`)) selectWeapon(id);
-      });
-      player.update(dt, moveDir, aimPoint, game);
+      if (!player.dead) {
+        WEAPON_ORDER.forEach((id, i) => {
+          if (input.tapped(`Digit${i + 1}`)) selectWeapon(id);
+        });
+        player.update(dt, moveDir, aimPoint, game);
+      }
       if (netSession) netSession.update(dt);
     } else {
       // --- HOST (o singleplayer): simulación completa ---
-      WEAPON_ORDER.forEach((id, i) => {
-        if (input.tapped(`Digit${i + 1}`)) selectWeapon(id);
-      });
-      if (input.tapped('KeyB') && game.unlocked.has('barrel')) {
-        if (game.weapon === 'barrel') placeBarrel();
-        else selectWeapon('barrel');
-      }
-      if (input.altTapped) placeBarrel();
-      if (input.tapped('ShiftLeft') || input.tapped('ShiftRight')) player.dash(moveDir, game);
-      if (input.tapped('KeyQ')) castSpell('stomp');
-      if (input.tapped('KeyE')) castSpell('frostnova');
+      if (!player.dead) {
+        WEAPON_ORDER.forEach((id, i) => {
+          if (input.tapped(`Digit${i + 1}`)) selectWeapon(id);
+        });
+        if (input.tapped('KeyB') && game.unlocked.has('barrel')) {
+          if (game.weapon === 'barrel') placeBarrel();
+          else selectWeapon('barrel');
+        }
+        if (input.altTapped) placeBarrel();
+        if (input.tapped('ShiftLeft') || input.tapped('ShiftRight')) player.dash(moveDir, game);
+        if (input.tapped('KeyQ')) castSpell('stomp');
+        if (input.tapped('KeyE')) castSpell('frostnova');
 
-      player.update(dt, moveDir, aimPoint, game);
-      if (!wheel.open) handleShooting();
+        player.update(dt, moveDir, aimPoint, game);
+        if (!wheel.open) handleShooting();
+      }
 
       // Player2 disparo: el host también maneja el disparo del guest.
       if (game.player2 && !game.player2.dead && netSession instanceof HostSession) {

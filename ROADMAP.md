@@ -602,3 +602,34 @@ las balas en las posiciones del snapshot (22Hz), no las simula. El fogonazo y
 el sonido de cada disparo ahora sí llegan siempre (evento). Simular las balas
 localmente desde el evento de disparo (como el host) las haría perfectas —
 pendiente si molesta.
+
+---
+
+## Online: animación en el guest + muerte correcta
+
+Dos bugs reportados:
+
+1. **Sin animaciones en el guest** (piernas, desmembramiento). Causa raíz: el
+   guest NUNCA llamaba a `Zombie.update()` (correcto, eso es simulación), pero
+   la animación de piernas vivía DENTRO de update(), así que nunca corría.
+   - Extraída la animación a `Zombie.animate(dt, moving)`, método público.
+   - El guest la llama en `#interpolate` para cada zombi, deduciendo `moving`
+     de si su posición está lejos del objetivo del snapshot.
+   - Desmembramiento: el evento `kill` (ahora con `id` fiable) dispara el
+     `die()` REAL del ghost, que genera los cubos con física. `die()` con
+     `fromNet` salta puntería/munición/puntos. Los sistemas de efectos
+     (particles/debris/decals) ya corrían para ambos lados, así que los cubos
+     caen bien.
+2. **Un jugador muerto seguía disparando y los zombis lo seguían.**
+   - `handleShooting` / inputs del host ahora sólo corren si `!player.dead`.
+   - El guest muerto no manda fire/dash/spell (sí sigue enviando para no
+     desconectar).
+   - Player2 disparo ya comprobaba `!player2.dead`.
+   - **Los zombis ahora persiguen al jugador VIVO más cercano** — antes el
+     target arrancaba en P1 sin comprobar si estaba muerto, así que si el host
+     moría, los zombis seguían yendo a su cadáver.
+
+### Pendiente del online
+- Estela de bala en el guest (se pinta por snapshot, no se simula).
+- Predicción de disparo del guest, reconexión, colocables del guest.
+- Aviso visual de "esperando al compañero" cuando uno muere y el otro sigue.
