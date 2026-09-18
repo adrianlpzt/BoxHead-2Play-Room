@@ -181,11 +181,22 @@ export class Net {
     this.#sendSignal({ type: 'join', room: code });
   }
 
-  /** Envía datos al peer (objeto → JSON). */
+  /** Envía datos al peer (objeto → JSON). Protegido con try/catch: un mensaje
+   *  demasiado grande o un canal saturado lanzan excepción que, sin capturar,
+   *  rompería el bucle de juego. */
   send(obj) {
     if (this.dc && this.dc.readyState === 'open') {
-      this.dc.send(JSON.stringify(obj));
+      try {
+        this.dc.send(JSON.stringify(obj));
+      } catch (e) {
+        console.warn('[Net] send falló:', e.message);
+      }
     }
+  }
+
+  /** true si el buffer del canal tiene sitio (evita encolar y perder snapshots). */
+  canSend() {
+    return this.dc && this.dc.readyState === 'open' && this.dc.bufferedAmount < 256 * 1024;
   }
 
   /** Cierra todo limpiamente. */

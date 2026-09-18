@@ -510,3 +510,39 @@ dispara en ráfaga en vez de un solo tiro por clic — el guest las siente más
 potentes de lo que deberían. Arreglo: mandar un flag de "tap" además del de
 "hold", replicando la distinción `fireTapped`/`fireDown` que ya existe en
 `Input.js` para el jugador local.
+
+---
+
+## Fix crítico: el guest no veía NADA — causa raíz encontrada
+
+Los tres arreglos anteriores (unlocks, balas, eventos) eran correctos pero
+tapaban un problema mayor que los hacía inútiles: **el snapshot completo no
+llegaba al guest en absoluto** en cuanto la oleada crecía.
+
+**Diagnóstico medido** (no intuido): el snapshot serializado como objetos con
+claves pesaba **15KB a 150 zombis**, justo en el límite de ~16KB de un mensaje
+DataChannel de WebRTC. Al superarlo, `dc.send()` **falla en silencio** — el
+navegador descarta el mensaje sin lanzar nada visible. El guest dejaba de
+recibir todo de golpe: ni zombis, ni tiros, ni nada.
+
+**Solución**: serialización compacta con **arrays planos** en vez de objetos con
+claves repetidas 150 veces. `{id,type,x,z,r,hp,fr,dead}` → `[id,t,x,z,r,hp,fl]`
+(flags empaquetados en bits). Índices numéricos para tipos de zombi, armas,
+pickups y eventos en vez de strings. Resultado: **15KB → 5,4KB a 150 zombis**,
+con margen de sobra. Verificado con test de integridad pack→JSON→unpack: todos
+los campos sobreviven el viaje intactos.
+
+**Arreglos secundarios en el mismo pase**:
+- `Net.send()` envuelto en try/catch (un fallo de envío ya no rompe el bucle).
+- `Net.canSend()`: no envía si `bufferedAmount` supera 256KB (evita encolar y
+  perder). El host comprueba antes de cada snapshot.
+- **Identificadores de mensaje** cambiados: snapshot es `{s:1,...}`, input es
+  `{i:1,...}`, hello sigue igual. Antes el host escuchaba `msg.type==='input'`
+  y el guest `msg.type==='snapshot'`, que el nuevo formato ya no ponía — otro
+  motivo por el que no llegaba nada.
+- **Flag `tap` en el input**: las armas no automáticas del guest ahora
+  disparan un tiro por clic, no en ráfaga (bug que quedó documentado antes).
+
+### Estado del online tras este fix
+Debería verse el mundo completo en el guest. Pendiente de confirmar jugando,
+porque no puedo probar dos navegadores conectados desde aquí.

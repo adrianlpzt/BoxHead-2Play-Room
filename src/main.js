@@ -723,19 +723,27 @@ function tick() {
       // Player2 disparo: el host también maneja el disparo del guest.
       if (game.player2 && !game.player2.dead && netSession instanceof HostSession) {
         const gi = netSession.guestInput;
-        if (gi.w) game.weapon2 = gi.w;
-        if (gi.f && weapons.canFire() && game.ammo[gi.w] > 0) {
-          const p2 = game.player2;
-          const p2muzzle = p2.muzzle();
-          const p2dir = new THREE.Vector3(Math.sin(gi.aim), 0, Math.cos(gi.aim));
-          const w = effWeapon(game, gi.w);
+        const gw = gi.weapon || 'pistol';
+        game.weapon2 = gw;
+        if (weapons.canFire() && game.unlocked.has(gw) && game.ammo[gw] > 0) {
+          const w = effWeapon(game, gw);
           if (w && !w.placeable && !w.thrown && !w.beam) {
-            weapons.fire(game, gi.w, p2muzzle, p2dir);
+            // Armas automáticas disparan con hold; las demás solo con tap.
+            const wants = w.auto ? gi.fire : gi.tap;
+            if (wants) {
+              const p2 = game.player2;
+              const p2muzzle = p2.muzzle();
+              const p2dir = new THREE.Vector3(Math.sin(gi.aim), 0, Math.cos(gi.aim));
+              if (weapons.fire(game, gw, p2muzzle, p2dir) && game.ammo[gw] !== Infinity) {
+                game.ammo[gw] -= 1;
+              }
+            }
           }
         }
-        if (gi.sp) {
-          castSpell(gi.sp);
-          gi.sp = null;
+        gi.tap = false; // consumir el tap
+        if (gi.spell) {
+          castSpell(gi.spell);
+          gi.spell = null;
         }
       }
 

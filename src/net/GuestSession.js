@@ -5,7 +5,7 @@ import { Mine } from '../entities/Mine.js';
 import { Turret } from '../entities/Turret.js';
 import { Pickup } from '../entities/Pickup.js';
 import { BomberCorpse } from '../entities/Zombie.js';
-import { packInput } from './Snapshot.js';
+import { packInput, unpackSnapshot } from './Snapshot.js';
 import { lerp } from '../core/Collision.js';
 
 /**
@@ -39,9 +39,9 @@ export class GuestSession {
     // Player2 ghost (el avatar del host visto por el guest).
     this.hostPlayer = this.#createGhostPlayer();
 
-    // Escucha snapshots del host.
+    // Escucha snapshots del host (formato compacto: {s:1, ...}).
     net.onData = (msg) => {
-      if (msg.type === 'snapshot') this.#onSnapshot(msg);
+      if (msg && msg.s === 1) this.#onSnapshot(unpackSnapshot(msg));
     };
   }
 
@@ -112,21 +112,21 @@ export class GuestSession {
     }
 
     // Sincronizar entidades ghost.
-    this.#syncList('zombies', snap.z, this.#createZombie.bind(this), this.#updateZombie.bind(this));
-    this.#syncList('barrels', snap.b, this.#createBarrel.bind(this), this.#updateBarrel.bind(this));
-    this.#syncList('mines', snap.m, this.#createMine.bind(this), this.#updateMine.bind(this));
-    this.#syncList('turrets', snap.tu, this.#createTurret.bind(this), this.#updateTurret.bind(this));
-    this.#syncList('pickups', snap.pk, this.#createPickup.bind(this), this.#updatePickup.bind(this));
-    this.#syncList('corpses', snap.co, this.#createCorpse.bind(this), this.#updateCorpse.bind(this));
+    this.#syncList('zombies', snap.zombies, this.#createZombie.bind(this), this.#updateZombie.bind(this));
+    this.#syncList('barrels', snap.barrels, this.#createBarrel.bind(this), this.#updateBarrel.bind(this));
+    this.#syncList('mines', snap.mines, this.#createMine.bind(this), this.#updateMine.bind(this));
+    this.#syncList('turrets', snap.turrets, this.#createTurret.bind(this), this.#updateTurret.bind(this));
+    this.#syncList('pickups', snap.pickups, this.#createPickup.bind(this), this.#updatePickup.bind(this));
+    this.#syncList('corpses', snap.corpses, this.#createCorpse.bind(this), this.#updateCorpse.bind(this));
 
     // Balas activas: reutilizamos el pool local de WeaponSystem SOLO como
     // superficie de dibujo — el guest nunca llama a weapons.fire(), así que
     // este pool está siempre libre para que lo pisemos con lo que diga el host.
-    this.#syncBullets(snap.bl || []);
+    this.#syncBullets(snap.bullets || []);
 
     // Eventos desde el último snapshot: dispara sonido/partículas/sangre local
     // para todo lo que el guest no simula (no pasa por takeDamage/fire reales).
-    for (const e of snap.ev || []) this.#applyEvent(e);
+    for (const e of snap.events || []) this.#applyEvent(e);
   }
 
   #syncBullets(list) {
@@ -291,12 +291,13 @@ export class GuestSession {
     const moveDir = new THREE.Vector3();
     inp.moveVector(moveDir);
     const aim = this.game.player.group.rotation.y;
-    const fire = inp.fireDown || inp.pressed('Space');
+    const fireDown = inp.fireDown || inp.pressed('Space');
+    const fireTap = inp.fireTapped || inp.tapped('Space');
     const weapon = this.game.weapon;
     const spell = inp.tapped('KeyQ') ? 'stomp' : inp.tapped('KeyE') ? 'frostnova' : null;
     const dash = inp.tapped('ShiftLeft') || inp.tapped('ShiftRight');
 
-    const msg = packInput(moveDir.x, moveDir.z, aim, fire, weapon, spell, dash);
+    const msg = packInput(moveDir.x, moveDir.z, aim, fireDown, weapon, spell, dash, fireTap);
     this.net.send(msg);
   }
 
